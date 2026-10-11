@@ -42,6 +42,18 @@ export const SIGNATURES = {
     hairpin: { name: 'VINE SWINGER', line: 'Tarzan would be proud.' },
     line: { name: 'JUNGLE JUSTICE', line: 'The law of the jungle, served cold.' },
   },
+  canal: {
+    landmark: { name: 'BRIDGE OUT', line: 'Took the scenic route. Into the canal.' },
+    shortcut: { name: 'BIKE LANE', line: 'Ring ring. Too late.' },
+    hairpin: { name: 'GABLE GRINDER', line: 'Tight streets, tighter exits.' },
+    line: { name: 'FLAT FINISH', line: 'Flattest town around. Flattest exit too.' },
+  },
+  space: {
+    landmark: { name: 'GATE CRASHER', line: 'Wrong way through the stargate.' },
+    shortcut: { name: 'WORMHOLE', line: 'In through the wormhole, out of the race.' },
+    hairpin: { name: 'SLINGSHOT', line: 'Gravity assist: denied.' },
+    line: { name: 'LAUNCH ABORT', line: 'Houston, they have a problem.' },
+  },
 };
 export const SIGNATURE_KINDS = ['landmark', 'shortcut', 'hairpin', 'line'];
 

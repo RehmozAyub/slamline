@@ -7,6 +7,7 @@ const RACE_CUTOFF = 4200; // music low-pass in races (the menus use 1400)
 const ENGINE_TONE = {
   wedge: { pitch: 1.0, burble: 0.35 }, gt: { pitch: 0.9, burble: 0.3 }, hatch: { pitch: 1.14, burble: 0.25 },
   muscle: { pitch: 0.78, burble: 0.55 }, hyper: { pitch: 1.1, burble: 0.28 }, rally: { pitch: 1.05, burble: 0.4 },
+  star: { pitch: 1.22, burble: 0.1 }, // PULSAR: a turbine whine
 };
 
 // Each track: tempo, root note and four 7th chords (semitones from the root), one per bar.
@@ -17,6 +18,8 @@ const SONGS = {
   snow: { bpm: 100, root: 52, chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [5, 8, 12, 15], [-2, 2, 5, 9]], bright: 0.7 }, // Em: i7 VImaj7 iv7 VII
   canyon: { bpm: 106, root: 55, chords: [[0, 4, 7, 11], [-2, 2, 5, 9], [5, 9, 12, 16], [0, 4, 7, 11]], bright: 0.8 }, // G: I bVII IV I
   jungle: { bpm: 118, root: 50, chords: [[0, 3, 7, 10], [5, 9, 12, 15], [0, 3, 7, 10], [-2, 2, 5, 9]], bright: 0.75 }, // D dorian: i7 IV7 i7 VII
+  canal: { bpm: 104, root: 57, chords: [[0, 4, 7, 11], [5, 9, 12, 16], [4, 7, 11, 14], [-3, 0, 4, 7]], bright: 0.85 }, // A: Imaj7 IVmaj7 iii7 vi7
+  space: { bpm: 122, root: 49, chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 2, 5, 9], [5, 8, 12, 15]], bright: 0.95 }, // C#m: i7 VImaj7 VII iv7
 };
 
 export class AudioEngine {
