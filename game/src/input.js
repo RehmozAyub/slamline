@@ -25,6 +25,8 @@ export function keyPlayer(action, code) {
   return 0;
 }
 
+// keys that still drive the menu while a text field has focus
+const FIELD_PASS = ['Enter', 'NumpadEnter', 'Escape', 'ArrowUp', 'ArrowDown', 'Tab'];
 const MENU_KEYS = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
@@ -42,6 +44,10 @@ export class Input {
     if (IS_MOBILE || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches)) this.setDevice('touch');
     window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') this.setDevice('touch'); }, true);
     window.addEventListener('keydown', (e) => {
+      // typing in a text field (online name / room code): the keys are the field's, except the
+      // ones that move through the menu
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && !FIELD_PASS.includes(e.code)) return;
       if (e.repeat) {
         if (MENU_KEYS[e.code] && ['up', 'down', 'left', 'right'].includes(MENU_KEYS[e.code])) this.emit(MENU_KEYS[e.code], e.code);
         e.preventDefault();
