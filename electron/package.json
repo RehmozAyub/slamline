@@ -1,13 +1,13 @@
 {
   "name": "apex-rush",
-  "productName": "ApexRush",
+  "productName": "Slamline",
   "version": "1.0.0",
-  "description": "APEX RUSH - takedown racing",
-  "author": "APEX RUSH",
+  "description": "SLAMLINE - takedown racing",
+  "author": "SLAMLINE",
   "main": "main.cjs",
   "build": {
     "appId": "com.apexrush.game",
-    "productName": "ApexRush",
+    "productName": "Slamline",
     "files": ["main.cjs", "game/**/*"],
     "asar": true,
     "directories": { "output": "dist" },
@@ -15,6 +15,6 @@
       "target": [{ "target": "portable", "arch": ["x64"] }],
       "icon": "icon.png"
     },
-    "portable": { "artifactName": "ApexRush.exe" }
+    "portable": { "artifactName": "Slamline.exe" }
   }
 }

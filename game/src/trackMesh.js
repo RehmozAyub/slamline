@@ -149,7 +149,7 @@ export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = nu
   gantry.add(beam);
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(track.width * 0.8, 1.5),
-    new THREE.MeshBasicMaterial({ map: textTexture('APEX RUSH', { accent: style.accent ?? '#ff2d55' }), toneMapped: false }),
+    new THREE.MeshBasicMaterial({ map: textTexture('SLAMLINE', { accent: style.accent ?? '#ff2d55' }), toneMapped: false }),
   );
   sign.position.set(0, 8.2, -0.41);
   sign.rotation.y = Math.PI;

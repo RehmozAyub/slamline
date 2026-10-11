@@ -1,14 +1,16 @@
-# APEX RUSH
+# SLAMLINE
+
+*(formerly APEX RUSH)*
 
 Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and power-ups across nine tracks.
 
 **Play now:** https://rehmozayub.github.io/apex-rush/
 **Windows exe:** see [Releases](https://github.com/RehmozAyub/apex-rush/releases) (portable, no install)
-**Android:** download `ApexRush.apk` from [Releases](https://github.com/RehmozAyub/apex-rush/releases) on your phone and open it (allow installing from your browser when Android asks). It runs offline. On an iPhone, open the Play now link and use Share → Add to Home Screen.
+**Android:** download `Slamline.apk` from [Releases](https://github.com/RehmozAyub/apex-rush/releases) on your phone and open it (allow installing from your browser when Android asks). It runs offline. On an iPhone, open the Play now link and use Share → Add to Home Screen.
 
 ## Features
 
-- 8 tracks with their own weather: Sunset Coast, Neon City, Alpine Pass, Whiteout Summit (snowfall), Scorched Canyon (dust storm), Monsoon Jungle (thunderstorm), Canal Quarter (golden hour over the canals, humpback bridges), Nebula Ring (an orbital speedway above a ringed gas giant) and Skyport (an airport: the runway is the main straight, taxiway shortcuts, jets taking off overhead)
+- 9 tracks with their own weather: Sunset Coast, Neon City, Alpine Pass, Whiteout Summit (snowfall), Scorched Canyon (dust storm), Monsoon Jungle (thunderstorm), Canal Quarter (golden hour over the canals, humpback bridges), Nebula Ring (an orbital speedway above a ringed gas giant) and Skyport (an airport: the runway is the main straight, taxiway shortcuts, jets taking off overhead)
 - 8 cars — Viper, Bolt, Raptor, Titan, Phantom, Rogue, the fighter-jet styled Jetstream and the starfighter-styled Pulsar — each with its own livery and balanced so every pick is competitive
 - 2 to 12 cars per race (Settings → CARS PER RACE; online the host picks it in the lobby)
 - 9 tracks, or **Random Track** to let the game pick
@@ -50,8 +52,8 @@ The game is plain ES modules with a vendored copy of three.js — no bundler.
 ```bash
 py -3 tools/serve.py        # http://localhost:5173 (no-cache dev server)
 node --test tests/logic.test.js
-node tools/build.mjs         # builds release/ApexRush.exe with Electron
-node tools/build-apk.mjs     # builds release/ApexRush.apk (set APEX_VERSION=1.12 for the version name)
+node tools/build.mjs         # builds release/Slamline.exe with Electron
+node tools/build-apk.mjs     # builds release/Slamline.apk (set APEX_VERSION=1.12 for the version name)
 node tools/make-icon.mjs     # redraws every icon (exe, web app, Android launcher)
 ```
 

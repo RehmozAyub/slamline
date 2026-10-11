@@ -1,4 +1,4 @@
-// Packages the game as an Android app: release/ApexRush.apk
+// Packages the game as an Android app: release/Slamline.apk
 // The toolchain (JDK 17, Android SDK, Gradle) and the Gradle build live in S:\ApexRushAndroid
 // (override with APEX_ANDROID_HOME) so nothing heavy syncs to Google Drive. First run downloads
 // about 3 GB. `node tools/build-apk.mjs --setup` only installs the toolchain; `--debug` builds
@@ -118,7 +118,7 @@ async function build() {
   run(`"${join(GRADLE, 'bin', 'gradle.bat')}" --no-daemon -q ${debug ? 'assembleDebug' : 'assembleRelease'}`, { cwd: work });
   const kind = debug ? 'debug' : 'release';
   const apk = join(work, 'app', 'build', 'outputs', 'apk', kind, `app-${kind}.apk`);
-  const name = debug ? 'ApexRush-debug.apk' : 'ApexRush.apk';
+  const name = debug ? 'Slamline-debug.apk' : 'Slamline.apk';
   mkdirSync(join(root, 'release'), { recursive: true });
   copyFileSync(apk, join(root, 'release', name));
   console.log(`\nBuilt release/${name} (${(statSync(apk).size / 1048576).toFixed(1)} MB)`);
