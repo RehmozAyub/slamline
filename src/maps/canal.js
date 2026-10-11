@@ -164,7 +164,7 @@ export default {
     for (const c of CX) addCanal(false, c);
 
     // bridges: brick decks under the road where it crosses a canal (signature landmark)
-    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x7a3a2a, roughness: 0.9 });
+    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x7a3a2a, roughness: 0.9, side: THREE.DoubleSide });
     const crossings = [];
     let prev = canalDist(track.x[0], track.z[0]);
     for (let i = 1; i <= track.n; i++) {
@@ -174,11 +174,30 @@ export default {
       if (d < CHW && d <= prev && d <= dn) crossings.push(j);
       prev = d;
     }
+    // Each bridge is two brick side walls that follow the road's arch (tops just under the road
+    // edge, bottoms in the water) plus the arch's underside, so nothing pokes up through the
+    // road at either end of the hump.
     for (const j of crossings) {
-      const p = track.pointAt(j * track.step, 0);
-      const deck = new THREE.Mesh(new THREE.BoxGeometry(track.width + 3, Math.max(0.6, p.y + 0.2), CHW * 2 + 10), bridgeMat);
-      deck.position.set(p.x, (p.y - 0.25) / 2 - 0.05, p.z);
-      deck.rotation.y = p.heading;
+      const half = Math.ceil((CHW + 9) / track.step);
+      const v = [], idx = [];
+      const W = hw + 1.6;
+      for (let k = -half; k <= half; k++) {
+        const i = (j + k + track.n) % track.n;
+        const x = track.x[i], y = track.y[i], z = track.z[i], rx = track.rx[i], rz = track.rz[i];
+        const top = y - 0.12, bot = WATER_Y - 0.5;
+        for (const sd of [-1, 1]) v.push(x + rx * sd * W, top, z + rz * sd * W, x + rx * sd * W, bot, z + rz * sd * W);
+      }
+      for (let k = 0; k < 2 * half; k++) {
+        const a = k * 4, b = (k + 1) * 4;
+        idx.push(a, b, a + 1, a + 1, b, b + 1); // left wall
+        idx.push(a + 2, a + 3, b + 2, b + 2, a + 3, b + 3); // right wall
+        idx.push(a, a + 2, b, b, a + 2, b + 2); // underside of the arch (just below the road)
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const deck = new THREE.Mesh(g, bridgeMat);
       deck.receiveShadow = true;
       scene.add(deck);
     }

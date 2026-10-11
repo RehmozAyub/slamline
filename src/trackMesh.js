@@ -236,12 +236,18 @@ function buildShortcut(sc, style) {
   const road = new THREE.Mesh(fixWinding(ribbon(path, [-shw, -0.03], [shw, -0.03], { closed: false }), true), dirt);
   road.receiveShadow = true;
   group.add(road);
-  // wheel ruts
-  const rut = new THREE.MeshStandardMaterial({ color: new THREE.Color(cfg.color ?? 0x6e5a44).multiplyScalar(0.6), roughness: 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-  for (const lat of [-2.2, 2.2]) {
-    const m = new THREE.Mesh(fixWinding(ribbon(path, [lat - 0.45, -0.02], [lat + 0.45, -0.02], { closed: false }), true), rut);
-    m.receiveShadow = true;
-    group.add(m);
+  if (cfg.taxiway) {
+    // a taxiway: smooth tarmac with a yellow centre line
+    const lineMat = new THREE.MeshStandardMaterial({ color: 0xffc400, emissive: 0x3a2a00, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    group.add(new THREE.Mesh(fixWinding(ribbon(path, [-0.16, -0.02], [0.16, -0.02], { closed: false }), true), lineMat));
+  } else {
+    // wheel ruts
+    const rut = new THREE.MeshStandardMaterial({ color: new THREE.Color(cfg.color ?? 0x6e5a44).multiplyScalar(0.6), roughness: 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    for (const lat of [-2.2, 2.2]) {
+      const m = new THREE.Mesh(fixWinding(ribbon(path, [lat - 0.45, -0.02], [lat + 0.45, -0.02], { closed: false }), true), rut);
+      m.receiveShadow = true;
+      group.add(m);
+    }
   }
   const shoulderMat = addWorldDetail(new THREE.MeshStandardMaterial({ color: style.shoulder ?? 0x3a3835, roughness: 0.95 }), { fine: [2.2, 0.7], macro: [0.05, 0.35], rough: 0.1 });
   const eMat = addWorldDetail(new THREE.MeshStandardMaterial({ color: style.embankment ?? 0x4a4a40, roughness: 1 }), { fine: [0.45, 0.45], macro: [0.03, 0.35], rough: 0 });
@@ -256,7 +262,7 @@ function buildShortcut(sc, style) {
   }
   addBarriers(group, path, style.barrier, shw + 0.5, keepFor, false);
   group.userData.pulses = entranceGuides(group, sc, style);
-  edgeReflectors(group, sc);
+  edgeReflectors(group, sc, cfg.studs);
 
   for (const r of sc.ramps) { group.add(rampMesh(path, r, shw)); group.add(rampGuides(path, r, shw, style)); }
   if (sc.fence) return group; // hidden shortcuts: no sign, a fence across the way in instead
@@ -265,7 +271,7 @@ function buildShortcut(sc, style) {
   const u = Math.min(path.length * 0.3, sc.overlapIn + 10);
   const p = path.pointAt(u, -sc.side * (shw + 1.8));
   const sign = new THREE.Group();
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.05), new THREE.MeshBasicMaterial({ map: textTexture('SHORTCUT ›', { accent: style.accent ?? '#ff2d55', font: 'italic 900 140px Bahnschrift, "Segoe UI", sans-serif' }), toneMapped: false, side: THREE.DoubleSide }));
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.05), new THREE.MeshBasicMaterial({ map: textTexture(cfg.sign || 'SHORTCUT ›', { accent: style.accent ?? '#ff2d55', bg: cfg.signBg || '#0b0b10', fg: cfg.signFg || '#ffffff', stripes: !cfg.signBg, font: 'italic 900 140px Bahnschrift, "Segoe UI", sans-serif' }), toneMapped: false, side: THREE.DoubleSide }));
   board.position.y = 2.4;
   sign.add(board);
   const postMat = new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.6, metalness: 0.5 });
@@ -470,7 +476,7 @@ function entranceGuides(group, sc, style) {
 }
 
 // Small amber reflector studs along both edges of a shortcut so its line shows up at night.
-function edgeReflectors(group, sc) {
+function edgeReflectors(group, sc, color = 0xffa820) {
   const path = sc.path, shw = path.halfWidth;
   const studs = [];
   for (let u = sc.overlapIn + 4; u < path.length - sc.overlapOut - 4; u += 9) {
@@ -480,7 +486,7 @@ function edgeReflectors(group, sc) {
     }
   }
   if (!studs.length) return;
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.1, 0.32), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffa820).multiplyScalar(1.3) }), studs.length);
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.1, 0.32), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.3) }), studs.length);
   const m = new THREE.Matrix4();
   studs.forEach((p, i) => { m.makeRotationY(p.heading); m.setPosition(p.x, p.y + 0.03, p.z); mesh.setMatrixAt(i, m); });
   group.add(mesh);

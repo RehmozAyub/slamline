@@ -6,10 +6,13 @@ const PLANK = new THREE.BoxGeometry(1, 0.22, 0.07);
 const POST = new THREE.BoxGeometry(0.16, 1.4, 0.16);
 
 export class FenceProps {
-  constructor(scene, shortcuts) {
+  // style: the track's shortcut style; { fence: 'boom' } gives red-and-white boom barriers
+  constructor(scene, shortcuts, style = {}) {
     this.scene = scene;
-    this.mat = new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: 0.9 });
-    this.dark = new THREE.MeshStandardMaterial({ color: 0x5a4028, roughness: 0.9 });
+    this.boom = style && style.fence === 'boom';
+    this.mat = new THREE.MeshStandardMaterial({ color: this.boom ? 0xd8202a : 0x8a6440, roughness: this.boom ? 0.5 : 0.9 });
+    this.alt = this.boom ? new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.5 }) : this.mat;
+    this.dark = new THREE.MeshStandardMaterial({ color: this.boom ? 0x3a3c42 : 0x5a4028, roughness: 0.9 });
     this.fences = shortcuts.filter((sc) => sc.fence).map((sc) => this.build(sc));
   }
 
@@ -32,7 +35,7 @@ export class FenceProps {
     for (const y of [0.35, 0.75, 1.15]) {
       for (let k = 0; k < segs; k++) {
         const w = span / segs;
-        const m = new THREE.Mesh(PLANK, this.mat);
+        const m = new THREE.Mesh(PLANK, (k + Math.round(y * 10)) % 2 ? this.alt : this.mat);
         m.scale.x = w * 0.98;
         m.position.set(-span / 2 + w * (k + 0.5), y - Math.sin(((k + 0.5) / segs) * Math.PI) * 0.04, 0);
         m.rotation.z = (Math.random() - 0.5) * 0.06;

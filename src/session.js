@@ -1,8 +1,8 @@
 // One race: cars, AI, collisions, Burnout events (boost, near miss, draft, takedowns, crashes),
 // power-ups, effects, cameras, audio and HUD feed. Supports one or two human players
 // (split screen); each human has their own boost meter, power-up, camera and HUD.
-// Online (opts.net) the two players race on their own devices: every car has an owner ('host'
-// or 'guest'); cars owned by the other device are "remote" - no physics or AI here, their state
+// Online (opts.net) 2-8 players race on their own devices: every car has an owner (a player id,
+// p0 = the host, who also runs the AI); cars owned by another device are "remote" - no physics or AI here, their state
 // comes from net/online.js. Wrecking a remote car asks its owner to (see takedown()).
 import * as THREE from 'three';
 import { Vehicle } from './vehicle.js';
@@ -56,10 +56,11 @@ export class RaceSession {
     this.finalLap = false;
     this.laps = opts.laps ?? LAPS;
     const humanDefs = opts.players || [{ carIndex: opts.carIndex, paintIndex: opts.paintIndex }];
-    // online: { role: 'host' | 'guest', seed }; players[0] is the host's pick, players[1] the guest's
+    // online: { role: 'host' | 'guest', me: player id, seed }; players[i] = { id, name, carIndex, paintIndex }
     const netOpts = opts.net || null;
     this.online = !!netOpts;
     this.role = netOpts ? netOpts.role : null;
+    this.me = netOpts ? netOpts.me : null; // this device's player id online
     this.net = null; // the Online controller, attached by it
     const rand = netOpts ? mulberry32(netOpts.seed) : Math.random;
     this.split = !this.online && humanDefs.length > 1;
@@ -88,7 +89,14 @@ export class RaceSession {
     // grid size: opts.cars (players + AI); the players start mid-pack (slots 4 and 5 of 8)
     const total = Math.max(humanDefs.length, clampCars(opts.cars ?? CAR_COUNT.def));
     const last = total - 1;
-    const humanSlots = humanDefs.length > 1 ? [Math.min(4, last - 1), Math.min(5, last)] : [Math.min(5, last)];
+    const nh = humanDefs.length;
+    let humanSlots;
+    if (nh === 1) humanSlots = [Math.min(5, last)];
+    else if (nh === 2) humanSlots = [Math.min(4, last - 1), Math.min(5, last)];
+    else { // online groups start mid-pack together
+      const first = Math.max(0, Math.min(total - nh, Math.ceil(total / 2) - Math.ceil(nh / 2)));
+      humanSlots = humanDefs.map((h, i) => first + i);
+    }
     const aiCount = total - humanDefs.length;
     const L = this.track.length;
     this.cars = [];
@@ -103,8 +111,8 @@ export class RaceSession {
       const hd = isPlayer ? humanDefs[hi] : null;
       const spec = isPlayer ? CARS[hd.carIndex] : CARS[Math.floor(rand() * CARS.length)];
       // online: who drives this car (AI cars are the host's)
-      const owner = !this.online ? null : isPlayer ? (hi === 0 ? 'host' : 'guest') : 'host';
-      const remote = this.online && owner !== this.role;
+      const owner = !this.online ? null : isPlayer ? hd.id : 'p0';
+      const remote = this.online && owner !== this.me;
       const local = isPlayer && !remote; // a human playing on this device
       const paint = isPlayer ? PAINTS[hd.paintIndex].hex : paints[ai % paints.length].hex;
       const v = new Vehicle(spec);
@@ -113,7 +121,7 @@ export class RaceSession {
       model.root.rotation.order = 'YXZ';
       world.scene.add(model.root);
       const car = {
-        id: this.online ? (isPlayer ? (local ? 'player' : 'friend') : `ai${ai}`) : isPlayer ? (hi === 0 ? 'player' : 'player2') : `ai${ai}`,
+        id: this.online ? (isPlayer ? (local ? 'player' : hd.id) : `ai${ai}`) : isPlayer ? (hi === 0 ? 'player' : 'player2') : `ai${ai}`,
         name: isPlayer ? (this.split ? `P${hi + 1}` : this.online ? hd.name || (local ? 'YOU' : 'FRIEND') : 'YOU') : names[ai],
         isPlayer, vehicle: v, model, spec, paint, human: null, owner, remote, index: slot,
         ai: isPlayer || remote ? null : new AIDriver(v, this.track, { lane: lat * 0.6, skill: aiSkill[ai % aiSkill.length], aggression: aiAggro[ai % aiAggro.length], refTopSpeed: refTop, shortcuts: this.shortcuts ? this.shortcuts.list : [] }),
@@ -154,7 +162,7 @@ export class RaceSession {
     this.slickId = 0;
     this.pendingStrikes = [];
     this.markers = new RivalMarkers(world.scene, this.humans.length);
-    this.fences = new FenceProps(world.scene, this.shortcuts ? this.shortcuts.list : []);
+    this.fences = new FenceProps(world.scene, this.shortcuts ? this.shortcuts.list : [], this.def.trackStyle.shortcut);
 
     if (this.def.headlights) {
       for (const H of this.humans) {
@@ -586,7 +594,7 @@ export class RaceSession {
 
   // shots and slicks (also spawned by the other device online: net/online.js)
   addShot(sh) {
-    sh.id = sh.id ?? `${this.role || 'l'}${++this.slickId}`;
+    sh.id = sh.id ?? `${this.me || 'l'}-${++this.slickId}`;
     sh.vis = this.pickVis.addShot();
     this.shots.push(sh);
     return sh;
@@ -594,7 +602,7 @@ export class RaceSession {
 
   addSlick(sl) {
     const R = PICKUP_RULES;
-    sl.id = sl.id ?? `${this.role || 'l'}${++this.slickId}`;
+    sl.id = sl.id ?? `${this.me || 'l'}-${++this.slickId}`;
     const p = this.roadOf(sl.sc).pointAt(sl.s, sl.lat);
     this.slicks.push(sl);
     this.pickVis.addSlick(sl.id, p.x, p.y, p.z, p.heading, R.slickHalfS, R.slickHalfLat);
@@ -911,7 +919,9 @@ export class RaceSession {
     c.pushedAt = -99;
     c.pushedBy = null;
     if (byCar && byCar !== c) byCar.kills = (byCar.kills || 0) + 1; // for the results table
-    if (byCar && byCar !== c && byCar.remote && !fromNet && !c.remote) this.net.credit(byCar, c, label, quiet);
+    // the attacker plays on another device: credit them there (also when the host judged a
+    // crash between two guests: the victim's device only wrecks, it never credits)
+    if (byCar && byCar !== c && byCar.remote && !fromNet) this.net.credit(byCar, c, label, quiet);
     if (fromNet) return;
     this.credit(byCar && byCar !== c ? byCar.human : null, c, label, quiet);
   }
