@@ -55,6 +55,17 @@ function filleted(corners, radius, y = () => 0, spacing = 45) {
   return out.map(([x, z]) => [x, y(x, z), z]);
 }
 
+// Canals of CANAL QUARTER (design-size coordinates): lines z = const and x = const. The road
+// rises over a humpback bridge wherever it crosses one.
+export const CANALS = { z: [-210, 40, 250], x: [-260, 330], halfWidth: 11, hump: 2.6, ramp: 30 };
+function canalHump(x, z) {
+  let d = Infinity;
+  for (const cz of CANALS.z) d = Math.min(d, Math.abs(z - cz));
+  for (const cx of CANALS.x) d = Math.min(d, Math.abs(x - cx));
+  const t = Math.max(0, 1 - d / CANALS.ramp);
+  return 0.4 + CANALS.hump * t * t * (3 - 2 * t);
+}
+
 // Every layout is scaled up from its design size (longer laps, room for the shortcuts).
 export const LAYOUT_SCALE = 1.2;
 
@@ -120,6 +131,29 @@ const LAYOUTS_BASE = {
       sz: 1.25,
       harmonics: [[2, 0.2, 0.3], [3, 0.1, 1.2], [4, 0.07, 2.2], [6, 0.035, 1.0], [9, 0.012, 0.4]],
       elevation: (th) => 20 + 10 * Math.sin(2 * th) + 6 * Math.sin(3 * th + 1),
+    }),
+  },
+  // CANAL QUARTER: a ring of streets through the old town; humpback bridges where it crosses
+  // a canal (design-size coordinates: see CANALS)
+  canal: {
+    width: 18,
+    points: filleted(
+      [[-470, -190], [-170, -330], [230, -310], [500, -130], [520, 170], [290, 320], [110, 170], [-90, 320], [-430, 250]],
+      [95, 85, 85, 95, 95, 70, 55, 70, 95],
+      (x, z) => canalHump(x, z),
+      18,
+    ),
+  },
+  // NEBULA RING: an orbital speedway floating high above nothing, with big climbs and drops
+  space: {
+    width: 20,
+    points: radial({
+      count: 40,
+      R: 390,
+      sx: 1.18,
+      sz: 1.0,
+      harmonics: [[2, 0.12, 2.6], [3, 0.14, 0.9], [4, 0.06, 0.1], [5, 0.04, 1.7], [7, 0.02, 2.9]],
+      elevation: (th) => 60 + 14 * Math.sin(2 * th + 0.7) + 7 * Math.sin(3 * th + 2.1) + 3 * Math.sin(5 * th),
     }),
   },
 };

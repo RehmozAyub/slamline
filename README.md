@@ -1,6 +1,6 @@
 # APEX RUSH
 
-Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and power-ups across six tracks.
+Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and power-ups across eight tracks.
 
 **Play now:** https://rehmozayub.github.io/apex-rush/
 **Windows exe:** see [Releases](https://github.com/RehmozAyub/apex-rush/releases) (portable, no install)
@@ -8,9 +8,10 @@ Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and 
 
 ## Features
 
-- 6 tracks with their own weather: Sunset Coast, Neon City, Alpine Pass, Whiteout Summit (snowfall), Scorched Canyon (dust storm), Monsoon Jungle (thunderstorm)
-- 6 cars — Viper, Bolt, Raptor, Titan, Phantom, Rogue — each with its own livery and balanced so every pick is competitive; 8 cars per race
-- 6 tracks, or **Random Track** to let the game pick
+- 8 tracks with their own weather: Sunset Coast, Neon City, Alpine Pass, Whiteout Summit (snowfall), Scorched Canyon (dust storm), Monsoon Jungle (thunderstorm), Canal Quarter (golden hour over the canals, humpback bridges) and Nebula Ring (an orbital speedway above a ringed gas giant)
+- 7 cars — Viper, Bolt, Raptor, Titan, Phantom, Rogue and the starfighter-styled Pulsar — each with its own livery and balanced so every pick is competitive
+- 2 to 12 cars per race (Settings → CARS PER RACE; online the host picks it in the lobby)
+- 8 tracks, or **Random Track** to let the game pick
 - **2-3 secret shortcuts** on every track, marked by softly pulsing arrows at the fork (some AI rivals take them too): ramps with airtime boost (drift into a jump for a flat spin, keep holding for an aerial donut, or barrel roll off a half ramp), and hidden ones behind wooden fences you smash through
 - **Rivals:** whoever wrecks you is marked RIVAL; take them out for a PAYBACK boost
 - **Signature takedowns:** four named spots per track; the first one you find snaps a photo of the crash
@@ -18,7 +19,7 @@ Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and 
 - **Final lap drama:** the music lifts, and a player right behind the leader gets pulled along
 - **Drive Assist** (on by default, per player): you still steer — it nudges you off the walls, calms over-steering, brakes for bends you would miss and makes wall hits less punishing — toggle it any time with H, [ or the gamepad Back button, or from the pause menu
 - **2-player split screen** on one keyboard (or two gamepads) — take each other out too
-- **Online with a friend:** ONLINE → HOST gives a 4-letter room code, your friend picks JOIN and types it. Both of you plus 6 AI rivals, each on your own PC, phone or browser; pick a name, the host picks the track. Cars are sent 60 times a second and smoothed; a hit between the two of you goes to whoever hit first. No account or server needed (a free matchmaking service connects you, then the games talk directly — a few very strict networks, like some university or office Wi-Fi, can't connect)
+- **Online with a friend:** ONLINE → HOST gives a 4-letter room code, your friend picks JOIN and types it. Both of you plus AI rivals (the host picks how many), each on your own PC, phone or browser; pick a name, the host picks the track. Cars are sent 60 times a second and smoothed; a hit between the two of you goes to whoever hit first. No account or server needed (a free matchmaking service connects you, then the games talk directly — a few very strict networks, like some university or office Wi-Fi, can't connect)
 - Boost meter filled by drifting, near misses, slipstreaming and takedowns, with an adrenaline chain multiplier up to ×5
 - Takedowns with slow-motion crash cam; rivals can take you out too
 - Road pickups: boost rings that respawn, and power-up blocks that show what they hold (grabbing a new one replaces yours; AI rivals grab about half of the blocks they drive through; pickups come back after half a second) — **Shockwave** (wrecks everyone near you), **Ricochet** (a shot that bounces down the road until it hits a rival), **Lightning Strike** (hits the car ahead), **Oil Slick** (drop it behind you — chasers crash)

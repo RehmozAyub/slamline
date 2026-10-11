@@ -230,7 +230,7 @@ export class UI {
   }
 
   // prog[i]: { stars: [bool x3], sigs: found, sigTotal } for each map
-  trackCards(maps, index, lengths, prog = []) {
+  trackCards(maps, index, lengths, prog = [], cars = 8) {
     const el = $('#cards');
     const n = maps.length;
     const random = `
@@ -242,7 +242,7 @@ export class UI {
       <div class="card c-${m.id}${i === index ? ' sel' : ''}" data-i="${i}">
         <div class="art"></div>
         <div class="info"><div class="num">0${i + 1}</div><div class="name">${m.name}</div><div class="tag">${m.tagline}</div>
-          <div class="meta"><span class="wx">${m.weatherLabel || ''}</span><span>${(lengths[i] / 1000).toFixed(2)} KM</span><span>8 CARS</span></div>
+          <div class="meta"><span class="wx">${m.weatherLabel || ''}</span><span>${(lengths[i] / 1000).toFixed(2)} KM</span><span>${cars} CARS</span></div>
           ${prog[i] ? `<div class="prog"><span class="stars">${prog[i].stars.map((s) => `<i class="${s ? 'on' : ''}">★</i>`).join('')}</span><span class="sigs">SIGNATURES ${prog[i].sigs}/${prog[i].sigTotal}</span></div>` : ''}</div>
       </div>`).join('') + random;
     return el;
