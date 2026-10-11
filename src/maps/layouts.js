@@ -156,6 +156,15 @@ const LAYOUTS_BASE = {
       elevation: (th) => 60 + 14 * Math.sin(2 * th + 0.7) + 7 * Math.sin(3 * th + 2.1) + 3 * Math.sin(5 * th),
     }),
   },
+  // SKYPORT: around an airport; the long south straight is the runway
+  airport: {
+    width: 20,
+    points: filleted(
+      [[-690, -240], [690, -240], [730, -30], [470, 150], [260, 60], [60, 250], [-300, 250], [-430, 90], [-650, 120]],
+      [120, 105, 110, 95, 70, 80, 90, 70, 110],
+      () => 0.6,
+    ),
+  },
 };
 
 export const LAYOUTS = Object.fromEntries(Object.entries(LAYOUTS_BASE).map(([id, l]) => [
