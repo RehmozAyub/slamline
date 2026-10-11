@@ -126,7 +126,7 @@ test('history interpolates positions', () => {
   assert.equal(p.speed, 15);
 });
 
-const claim = (from, t, attacker, kind = 'takedown') => ({ from, t, attacker, kind, nx: 1, nz: 0, closing: 20 });
+const claim = (from, t, attacker, kind = 'takedown', victim = attacker === 'host' ? 'guest' : 'host') => ({ from, t, attacker, victim, kind, nx: 1, nz: 0, closing: 20 });
 
 test('earliest hit wins when both players claim the same contact', () => {
   const j = new HitJudge();
@@ -180,4 +180,20 @@ test('plausible contact allows for lag at speed', () => {
   assert.ok(plausibleContact(a, b, 0.1)); // 5 + 80 * 0.05 + 1.5 = 10.5 m
   assert.ok(!plausibleContact(a, { ...b, x: 12 }, 0.1));
   assert.ok(!plausibleContact(null, b, 0.1));
+});
+
+test('with more players, each pair of cars is judged on its own', () => {
+  const j = new HitJudge();
+  // p1 rams p2 while, at the same moment, p3 rams p0: two separate contacts
+  assert.equal(j.add(claim('p1', 10.0, 'p1', 'takedown', 'p2'), 10.05, 0.1), null);
+  assert.equal(j.add(claim('p3', 10.01, 'p3', 'takedown', 'p0'), 10.05, 0.1), null);
+  const a = j.add(claim('p2', 10.02, 'p2', 'push', 'p1'), 10.08, 0.1);
+  assert.equal(a.attacker, 'p1');
+  assert.equal(a.victim, 'p2');
+  const b = j.add(claim('p0', 10.03, 'p0', 'push', 'p3'), 10.08, 0.1);
+  assert.equal(b.attacker, 'p3');
+  assert.equal(b.victim, 'p0');
+  // a cooldown on one pair doesn't block another
+  assert.ok(j.add(claim('p1', 10.2, 'p1', 'takedown', 'p3'), 10.25, 0.1) === null);
+  assert.equal(j.update(11, () => true).length, 1);
 });

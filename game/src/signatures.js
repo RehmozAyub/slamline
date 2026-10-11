@@ -48,6 +48,12 @@ export const SIGNATURES = {
     hairpin: { name: 'GABLE GRINDER', line: 'Tight streets, tighter exits.' },
     line: { name: 'FLAT FINISH', line: 'Flattest town around. Flattest exit too.' },
   },
+  airport: {
+    landmark: { name: 'GROUNDED', line: 'Cleared for takeoff. Not for landing.' },
+    shortcut: { name: 'TAXI SERVICE', line: 'Wrong gate. Wrong everything.' },
+    hairpin: { name: 'HOLDING PATTERN', line: 'Circled once. Never came back.' },
+    line: { name: 'FINAL APPROACH', line: 'Missed the runway by a mile.' },
+  },
   space: {
     landmark: { name: 'GATE CRASHER', line: 'Wrong way through the stargate.' },
     shortcut: { name: 'WORMHOLE', line: 'In through the wormhole, out of the race.' },

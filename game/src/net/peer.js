@@ -107,17 +107,17 @@ export async function host(onGuest, onError = () => {}) {
     });
     if (ok === 'taken') { peer.destroy(); continue; }
     if (ok !== true) { peer.destroy(); throw ok; }
-    let current = null;
+    const links = new Set();
     peer.removeAllListeners('error');
     peer.on('error', (e) => onError(brokerError(e)));
     peer.on('connection', (conn) => {
-      if (current && !current.closed) { conn.on('open', () => conn.close()); return; } // one friend at a time
       conn.on('open', () => {
-        current = new PeerLink(conn, { destroy() {} });
-        onGuest(current);
+        const link = new PeerLink(conn, { destroy() {} });
+        links.add(link);
+        onGuest(link); // the lobby decides whether there is room
       });
     });
-    return { code, close() { if (current) current.close(); peer.destroy(); } };
+    return { code, close() { for (const l of links) l.close(); peer.destroy(); } };
   }
   throw new NetError('broker', "CAN'T REACH THE ONLINE SERVICE");
 }
@@ -232,27 +232,28 @@ function simChannel(code, me) {
 async function simHost(onGuest) {
   const code = makeCode();
   const lobby = new BroadcastChannel('apexrush-sim-lobby');
-  let current = null;
+  const links = new Set();
   lobby.onmessage = (e) => {
     if (e.data.type !== 'join' || e.data.code !== code) return;
-    if (current && !current.closed) return;
-    current = simChannel(code, 'host').link;
-    lobby.postMessage({ type: 'welcome', code });
-    onGuest(current);
+    const link = simChannel(`${code}-${e.data.gid}`, 'host').link; // one channel per guest
+    links.add(link);
+    lobby.postMessage({ type: 'welcome', code, gid: e.data.gid });
+    onGuest(link);
   };
-  return { code, close() { if (current) current.close(); lobby.close(); } };
+  return { code, close() { for (const l of links) l.close(); lobby.close(); } };
 }
 
 function simJoin(code) {
   return new Promise((resolve, reject) => {
     const lobby = new BroadcastChannel('apexrush-sim-lobby');
     const t = setTimeout(() => { lobby.close(); reject(new NetError('nogame', 'NO GAME WITH THAT CODE')); }, 3000);
+    const gid = Math.random().toString(36).slice(2, 8);
     lobby.onmessage = (e) => {
-      if (e.data.type !== 'welcome' || e.data.code !== code) return;
+      if (e.data.type !== 'welcome' || e.data.code !== code || e.data.gid !== gid) return;
       clearTimeout(t);
       lobby.close();
-      resolve(simChannel(code, 'guest').link);
+      resolve(simChannel(`${code}-${gid}`, 'guest').link);
     };
-    lobby.postMessage({ type: 'join', code });
+    lobby.postMessage({ type: 'join', code, gid });
   });
 }
