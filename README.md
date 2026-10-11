@@ -4,9 +4,9 @@
 
 Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and power-ups across nine tracks.
 
-**Play now:** https://rehmozayub.github.io/apex-rush/
-**Windows exe:** see [Releases](https://github.com/RehmozAyub/apex-rush/releases) (portable, no install)
-**Android:** download `Slamline.apk` from [Releases](https://github.com/RehmozAyub/apex-rush/releases) on your phone and open it (allow installing from your browser when Android asks). It runs offline. On an iPhone, open the Play now link and use Share → Add to Home Screen.
+**Play now:** https://rehmozayub.github.io/slamline/
+**Windows exe:** see [Releases](https://github.com/RehmozAyub/slamline/releases) (portable, no install)
+**Android:** download `Slamline.apk` from [Releases](https://github.com/RehmozAyub/slamline/releases) on your phone and open it (allow installing from your browser when Android asks). It runs offline. On an iPhone, open the Play now link and use Share → Add to Home Screen.
 
 ## Features
 
