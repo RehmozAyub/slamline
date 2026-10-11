@@ -12,7 +12,7 @@ import { buildCar, disposeCar } from './carModel.js';
 import { RaceSession } from './session.js';
 import { MAPS } from './maps/index.js';
 import { TrackPath } from './trackMath.js';
-import { CARS, PAINTS, QUALITY, QUALITY_ORDER, QUALITY_CHOICES, IS_MOBILE, IS_APP, STEERING, STEERING_LABEL, autoQuality, loadSettings, saveSettings } from './config.js';
+import { CARS, PAINTS, QUALITY, QUALITY_ORDER, QUALITY_CHOICES, IS_MOBILE, IS_APP, STEERING, STEERING_LABEL, autoQuality, loadSettings, saveSettings, clampCars } from './config.js';
 import { formatTime } from './race.js';
 import { recordRace, discoverSignature, unlockedPaints, unlockText, STARS } from './progress.js';
 import { SIGNATURE_KINDS } from './signatures.js';
@@ -21,6 +21,7 @@ import { TouchControls } from './touch.js';
 
 // setTimeout (not rAF) so loading also progresses when the window is hidden
 const IS_DESKTOP = /Electron/i.test(navigator.userAgent);
+const TRACK_COLS = 4; // track cards per row (style.css .cards)
 const nextFrame = () => new Promise((r) => setTimeout(r, 20));
 
 // the GPU's name (for GRAPHICS AUTO), from a throwaway context
@@ -228,8 +229,11 @@ class Game {
   showTracks() {
     this.state = 'tracks';
     this.ui.show('tracks');
-    this.ui.trackCards(MAPS, this.sel.track, this.trackLengths, this.trackProgress());
+    this.ui.trackCards(MAPS, this.sel.track, this.trackLengths, this.trackProgress(), this.carCount());
   }
+
+  // cars per race (Settings); online races use the host's choice
+  carCount() { return clampCars(this.settings.cars); }
 
   showCars(pick = 0) {
     this.state = 'cars';
@@ -250,6 +254,7 @@ class Game {
     const items = [{ key: 'assist', label: 'DRIVE ASSIST', value: onOff(s.assist) }];
     if (!IS_MOBILE) items.push({ key: 'assist2', label: 'DRIVE ASSIST · PLAYER 2', value: onOff(s.assist2) });
     if (this.touch) items.push({ key: 'steering', label: 'STEERING', value: STEERING_LABEL[s.steering] });
+    items.push({ key: 'cars', label: 'CARS PER RACE', value: `‹ ${this.carCount()} ›` });
     items.push(
       { key: 'quality', label: 'GRAPHICS', value: s.quality === 'auto' ? `AUTO · ${QUALITY[this.qualityName].label}` : QUALITY[s.quality].label },
       { key: 'motionBlur', label: 'MOTION BLUR', value: onOff(s.motionBlur) },
@@ -292,6 +297,7 @@ class Game {
     const s = this.settings;
     const key = this.settingsItems()[i].key;
     if (key === 'assist' || key === 'assist2') this.setAssist(key === 'assist' ? 0 : 1, !s[key]);
+    else if (key === 'cars') s.cars = clampCars(this.carCount() + dir);
     else if (key === 'quality') {
       const n = QUALITY_CHOICES.length, k = QUALITY_CHOICES.indexOf(s.quality);
       s.quality = QUALITY_CHOICES[(k + dir + n) % n];
@@ -394,7 +400,7 @@ class Game {
     let players = [{ carIndex: this.sel.car, paintIndex: this.sel.paint }];
     if (this.players > 1) players.push({ carIndex: this.sel2.car, paintIndex: this.sel2.paint });
     if (online) players = online.players;
-    this.session = new RaceSession(this, this.world, { players, net: online ? online.net : null });
+    this.session = new RaceSession(this, this.world, { players, net: online ? online.net : null, cars: online ? online.cars : this.carCount() });
     this.ui.clearPopups();
     this.state = 'race';
     this.ui.show('hud');
@@ -483,13 +489,13 @@ class Game {
       if (a === 'confirm') this.titleSelect(this.menuIndex.title);
     } else if (st === 'tracks') {
       if (a === 'left' || a === 'right' || a === 'up' || a === 'down') {
-        // six cards in a 3x2 grid, then the RANDOM bar underneath (index MAPS.length)
-        const n = MAPS.length, t = this.sel.track;
+        // the cards in a grid of COLS columns, then the RANDOM bar underneath (index MAPS.length)
+        const n = MAPS.length, t = this.sel.track, C = TRACK_COLS;
         if (a === 'left' || a === 'right') this.sel.track = (t + (a === 'left' ? -1 : 1) + n + 1) % (n + 1);
-        else if (t === n) this.sel.track = a === 'up' ? n - 2 : 1;
-        else if (a === 'down') this.sel.track = t + 3 < n ? t + 3 : n;
-        else this.sel.track = t - 3 >= 0 ? t - 3 : n;
-        this.ui.trackCards(MAPS, this.sel.track, this.trackLengths, this.trackProgress());
+        else if (t === n) this.sel.track = a === 'up' ? n - C + 1 : 1;
+        else if (a === 'down') this.sel.track = t + C < n ? t + C : n;
+        else this.sel.track = t - C >= 0 ? t - C : n;
+        this.ui.trackCards(MAPS, this.sel.track, this.trackLengths, this.trackProgress(), this.carCount());
         this.audio.blip(600, 0.03, 0.06);
         this.previewTrack();
       }
@@ -623,7 +629,7 @@ class Game {
       if (!c) return;
       const i = Number(c.dataset.i);
       if (i === this.sel.track) this.showCars();
-      else { this.sel.track = i; this.ui.trackCards(MAPS, i, this.trackLengths, this.trackProgress()); this.previewTrack(); }
+      else { this.sel.track = i; this.ui.trackCards(MAPS, i, this.trackLengths, this.trackProgress(), this.carCount()); this.previewTrack(); }
     });
     document.getElementById('swatches').addEventListener('click', (e) => {
       const s = e.target.closest('i');

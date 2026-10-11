@@ -1,7 +1,7 @@
 // Online menus: your name, HOST (get a room code) / JOIN (type one), the lobby, and the race
 // start handshake. The race itself runs in RaceSession + net/online.js.
 import { MAPS } from './maps/index.js';
-import { CARS, PAINTS, saveSettings } from './config.js';
+import { CARS, PAINTS, saveSettings, clampCars } from './config.js';
 import { host, join, onTick } from './net/peer.js';
 import { Online, NET_VERSION } from './net/online.js';
 import { CODE_CHARS } from './net/protocol.js';
@@ -21,6 +21,7 @@ export class OnlineFlow {
     this.room = null; // host: { code, close }
     this.friend = null; // { name, car, paint }
     this.hostTrack = 0; // guest: the track the host picked (MAPS.length = RANDOM)
+    this.cars = null; // cars per race in this room (the host's choice)
     this.index = { online: 0, join: 0, lobby: 0 };
     this.busy = false;
     this.build();
@@ -172,7 +173,8 @@ export class OnlineFlow {
 
   send(m) { if (this.net) this.net.send(m); }
   mine() { const s = this.game.sel; return { name: this.myName, car: s.car, paint: s.paint }; }
-  lobbyInfo() { return { type: 'lobby', ...this.mine(), track: this.game.sel.track }; }
+  lobbyInfo() { return { type: 'lobby', ...this.mine(), track: this.game.sel.track, cars: this.roomCars() }; }
+  roomCars() { return clampCars(this.cars ?? this.game.carCount()); }
 
   // --- lobby ----------------------------------------------------------------------------
   openLobby(note = '') {
@@ -199,11 +201,12 @@ export class OnlineFlow {
       return [
         { label: 'START RACE', disabled: !this.friend },
         { label: 'TRACK', value: `‹ ${trackName} ›` },
+        { label: 'CARS', value: `‹ ${this.roomCars()} ›` },
         { label: 'CAR', value: CARS[this.game.sel.car].name },
         { label: 'LEAVE' },
       ];
     }
-    return [{ label: 'TRACK', value: trackName, disabled: true }, { label: 'CAR', value: CARS[this.game.sel.car].name }, { label: 'LEAVE' }];
+    return [{ label: 'TRACK', value: trackName, disabled: true }, { label: 'CARS', value: String(this.roomCars()), disabled: true }, { label: 'CAR', value: CARS[this.game.sel.car].name }, { label: 'LEAVE' }];
   }
 
   renderLobby() {
@@ -218,14 +221,17 @@ export class OnlineFlow {
   }
 
   lobbySelect(i, e) {
-    const g = this.game, key = this.role === 'host' ? ['start', 'track', 'car', 'leave'][i] : ['track', 'car', 'leave'][i];
+    const g = this.game, key = this.role === 'host' ? ['start', 'track', 'cars', 'car', 'leave'][i] : ['track', 'cars', 'car', 'leave'][i];
+    const half = () => { const r = e && e.target.closest('em') ? e.target.closest('em').getBoundingClientRect() : null; return r && e.clientX < (r.left + r.right) / 2 ? -1 : 1; };
     if (key === 'start') {
       if (!this.friend) { this.lobbyNote('', false); g.audio.blip(300, 0.06, 0.08); return; }
       this.hostStart(g.sel.track);
     } else if (key === 'track') {
       if (this.role !== 'host') return;
-      const r = e && e.target.closest('em') ? e.target.closest('em').getBoundingClientRect() : null;
-      this.cycleTrack(r && e.clientX < (r.left + r.right) / 2 ? -1 : 1);
+      this.cycleTrack(half());
+    } else if (key === 'cars') {
+      if (this.role !== 'host') return;
+      this.cycleCars(half());
     } else if (key === 'car') {
       g.audio.blip(900, 0.06, 0.1);
       g.showCars(0);
@@ -239,6 +245,13 @@ export class OnlineFlow {
     this.renderLobby();
     this.send(this.lobbyInfo());
     if (g.sel.track < MAPS.length) g.previewTrack();
+  }
+
+  cycleCars(d) {
+    this.cars = clampCars(this.roomCars() + d);
+    this.game.audio.blip(600, 0.03, 0.06);
+    this.renderLobby();
+    this.send(this.lobbyInfo());
   }
 
   // the car screen was confirmed (or backed out of) while online
@@ -266,6 +279,7 @@ export class OnlineFlow {
       const n = this.lobbyItems().length;
       if (a === 'up' || a === 'down') { move('lobby', n, a === 'up' ? -1 : 1); this.renderLobby(); }
       if ((a === 'left' || a === 'right') && this.role === 'host' && this.index.lobby === 1) this.cycleTrack(a === 'left' ? -1 : 1);
+      if ((a === 'left' || a === 'right') && this.role === 'host' && this.index.lobby === 2) this.cycleCars(a === 'left' ? -1 : 1);
       if (a === 'confirm' && code !== 'Space') this.lobbySelect(this.index.lobby);
       if (a === 'back') this.leave();
     }
@@ -286,6 +300,7 @@ export class OnlineFlow {
     } else if (m.type === 'lobby') {
       this.friend = { name: cleanName(m.name) || 'HOST', car: m.car | 0, paint: m.paint | 0 };
       this.hostTrack = m.track | 0;
+      this.cars = clampCars(m.cars);
       if (g.state === 'lobby') { this.renderLobby(); this.lobbyNote(''); }
     } else if (m.type === 'refuse') {
       this.disconnect();
@@ -308,7 +323,7 @@ export class OnlineFlow {
     const t = track >= MAPS.length ? g.rollTrack() : track;
     const seed = (Math.random() * 2 ** 31) | 0;
     const me = this.mine();
-    const m = { type: 'start', track: t, random: track >= MAPS.length, seed, players: [{ name: me.name, carIndex: me.car, paintIndex: me.paint }, { name: this.friend.name, carIndex: this.friend.car, paintIndex: this.friend.paint }] };
+    const m = { type: 'start', track: t, random: track >= MAPS.length, seed, cars: this.roomCars(), players: [{ name: me.name, carIndex: me.car, paintIndex: me.paint }, { name: this.friend.name, carIndex: this.friend.car, paintIndex: this.friend.paint }] };
     this.send(m);
     this.raceStart(m);
   }
@@ -318,7 +333,7 @@ export class OnlineFlow {
     this.starting = true;
     this.lastResults = null;
     g.raceTrack = m.track;
-    await g.startRace(false, { net: { role: this.role, seed: m.seed }, players: m.players, random: m.random });
+    await g.startRace(false, { net: { role: this.role, seed: m.seed }, players: m.players, random: m.random, cars: clampCars(m.cars) });
     this.starting = false;
     if (!this.net || !g.session) return;
     this.net.attach(g.session, m.seed);

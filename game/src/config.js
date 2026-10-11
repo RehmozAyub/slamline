@@ -21,6 +21,7 @@ const CAR_DEFS = [
   { id: 'titan', name: 'TITAN', desc: 'Muscle brute. Wins every shoving match.', style: 'muscle', points: { speed: 7, accel: 6, handling: 5, strength: 7 } },
   { id: 'phantom', name: 'PHANTOM', desc: 'Hypercar. Blistering top end, light on its feet.', style: 'hyper', points: { speed: 9, accel: 7, handling: 6, strength: 3 } },
   { id: 'rogue', name: 'ROGUE', desc: 'Lifted rally hatch. Loves to slide.', style: 'rally', points: { speed: 6, accel: 7, handling: 7, strength: 4 } },
+  { id: 'pulsar', name: 'PULSAR', desc: 'Starfighter on wheels. Glides through fast bends.', style: 'star', points: { speed: 7, accel: 7, handling: 7, strength: 3 } },
 ];
 
 export const CARS = CAR_DEFS.map((d) => {
@@ -53,7 +54,11 @@ export const PAINTS = [
 ];
 export const BASE_PAINTS = PAINTS.filter((p) => !p.unlock).length; // AI rivals only use these
 
-export const AI_NAMES = ['VORTEX', 'KAZE', 'NOVA', 'RAZOR', 'HAVOC', 'STRYKER', 'ONYX', 'BLITZ', 'VIXEN', 'DIESEL'];
+export const AI_NAMES = ['VORTEX', 'KAZE', 'NOVA', 'RAZOR', 'HAVOC', 'STRYKER', 'ONYX', 'BLITZ', 'VIXEN', 'DIESEL', 'COMET', 'RIPTIDE'];
+
+// cars per race (players + AI), chosen in Settings (online: by the host in the lobby)
+export const CAR_COUNT = { min: 2, max: 12, def: 8 };
+export const clampCars = (n) => Math.max(CAR_COUNT.min, Math.min(CAR_COUNT.max, Math.round(Number(n) || CAR_COUNT.def)));
 
 // Device: phones and tablets get touch controls, phone graphics presets and no split screen.
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
@@ -95,7 +100,7 @@ export const BOOST_SPEED = 1.32;
 export const BOOST_ACCEL = 1.7;
 
 export function loadSettings() {
-  const def = { quality: 'auto', autoQ: null, steering: 'slider', vibration: true, motionBlur: true, master: 0.8, music: 0.55, assist: true, assist2: true, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
+  const def = { quality: 'auto', autoQ: null, steering: 'slider', vibration: true, motionBlur: true, master: 0.8, music: 0.55, assist: true, assist2: true, cars: 8, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
   try {
     const s = JSON.parse(localStorage.getItem('apexrush.settings') || '{}');
     const p = s.progress || {};

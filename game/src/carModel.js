@@ -109,6 +109,23 @@ const STYLES = {
       wheel: { style: 'rally', rim: 'gold' }, caliper: 0xd01818, mirrors: true, grille: 'dark',
     },
   },
+  star: { // PULSAR: starfighter on wheels, bubble canopy, twin tail fins, glowing thrusters
+    length: 4.6, wheelBase: 2.7, wheelR: 0.35, tyreW: 0.32, track: 1.03, rideY: 0, n: 3.2,
+    body: [
+      [0.0, 0.84, 0.7, 0.32, 0.8], [0.06, 0.97, 0.82, 0.26, 0.88], [0.25, 1.02, 0.88, 0.24, 0.88],
+      [0.45, 1.0, 0.86, 0.24, 0.82], [0.65, 0.96, 0.8, 0.24, 0.72], [0.82, 0.88, 0.68, 0.25, 0.58],
+      [0.94, 0.7, 0.48, 0.27, 0.46], [1.0, 0.46, 0.28, 0.3, 0.38],
+    ],
+    cabin: [
+      [0.38, 0.46, 0.28, 0.74, 0.8], [0.46, 0.62, 0.46, 0.72, 1.08], [0.56, 0.66, 0.5, 0.7, 1.16],
+      [0.66, 0.62, 0.44, 0.66, 1.04], [0.76, 0.46, 0.24, 0.6, 0.7],
+    ],
+    f: {
+      wing: 'star', stripes: 'none', glow: true, canards: true, fins: true,
+      head: 'bar', headY: 0.4, headU: 0.97, tail: 'bar', tailY: 0.76, exhaust: 'thrusters',
+      wheel: { style: 'turbine', rim: 'gunmetal' }, caliper: 0x19e3ff, mirrors: false,
+    },
+  },
 };
 
 export const CAR_STYLES = Object.keys(STYLES);
@@ -397,6 +414,27 @@ function liveryTexture(styleId, S, paintHex) {
       text('PHANTOM', L / 2 + 0.15, -0.14, 0.13, pal.accent, { weight: 700 });
     });
     top(() => { poly([[L, -0.03], [L, 0.03], [fa - 0.4, 0.14], [fa - 0.3, 0], [fa - 0.4, -0.14]], pal.accent); });
+  } else if (styleId === 'star') { // PULSAR: a starfield band along the sides, an orbit line
+    side(() => {
+      poly([[0, 0.06], [L, -0.12], [L, -0.6], [0, -0.6]], '#0a0c1c');
+      let r = 7;
+      const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 70; i++) {
+        const x = rnd() * L, y = -0.12 - rnd() * 0.42;
+        g.fillStyle = rnd() < 0.2 ? '#9ff4ff' : '#ffffff';
+        g.globalAlpha = 0.4 + rnd() * 0.6;
+        g.beginPath(); g.arc(X(x), Y(y), (0.006 + rnd() * 0.01) * pv, 0, Math.PI * 2); g.fill();
+      }
+      g.globalAlpha = 1;
+      line(0, 0.06, L, -0.12, 0.035, '#5ff0ff');
+      line(ra - 0.2, 0.16, fa + 0.3, 0.02, 0.012, pal.light);
+      text('PULSAR', L / 2 - 0.1, -0.26, 0.12, '#9ff4ff', { weight: 700 });
+    });
+    top(() => {
+      g.strokeStyle = 'rgba(95,240,255,0.8)';
+      g.lineWidth = 0.02 * pv;
+      g.beginPath(); g.ellipse(X(fa - 0.3), 0, 0.5 * pu, 0.3 * pv, 0, 0, Math.PI * 2); g.stroke();
+    });
   } else if (styleId === 'rally') { // ROGUE: rally blocks and sponsor panels
     side(() => {
       poly([[L, -0.5], [L, 0.5], [fa - 0.35, 0.5], [fa - 1.05, -0.5]], pal.accent);
@@ -660,6 +698,7 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
   const headMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xe8f2ff).multiplyScalar(5) });
   const tailMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff1028).multiplyScalar(2.5) });
   const amberMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb040).multiplyScalar(3) });
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x30e8ff).multiplyScalar(2.6) });
 
   const p = new Parts();
   p.add('paint', loft(S.body, L, { n: S.n, stations: 44, M: 36 }), true);
@@ -758,6 +797,12 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
   else if (F.exhaust === 'side') { ex(0.55, 0.32, 0.07); }
   else if (F.exhaust === 'dual') { ex(-0.7, 0.33, 0.1); ex(0.7, 0.33, 0.1); }
   else if (F.exhaust === 'center1') { ex(0, 0.52, 0.14, 6); }
+  else if (F.exhaust === 'thrusters') { // two big nozzles with a glowing core
+    for (const sx of [-1, 1]) {
+      ex(sx * 0.4, 0.48, 0.17, 16);
+      p.tube('glow', 0.13, 0.02, 16, sx * 0.4, 0.48, tz - 0.13);
+    }
+  }
 
   // wings / spoilers
   if (F.wing === 'swan') {
@@ -784,6 +829,14 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
       p.box('carbon', 0.03, 0.36, 0.52, sx * 1.0, wy - 0.12, wz);
       p.box('carbon', 0.05, 0.22, 0.14, sx * 0.48, wy - 0.12, wz + 0.02);
     }
+  }
+  if (F.wing === 'star') {
+    const u = 0.07, y0 = topY(u);
+    for (const sx of [-1, 1]) {
+      p.add('paint', xf(new THREE.BoxGeometry(0.05, 0.5, 0.75), sx * 0.66, y0 + 0.2, zOf(u) + 0.05, -0.55, 0, sx * 0.32));
+      p.add('glow', xf(new THREE.BoxGeometry(0.06, 0.04, 0.7), sx * 0.74, y0 + 0.43, zOf(u) - 0.05, -0.55, 0, sx * 0.32));
+    }
+    p.add('carbon', xf(new THREE.BoxGeometry(1.45, 0.035, 0.3), 0, y0 + 0.36, zOf(u) - 0.08, -0.08));
   }
   if (F.fin) {
     const zc = zOf(cab[1][0]), ze = zOf(0.05);
@@ -813,6 +866,12 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
   // sides
   if (F.sideIntakes) {
     for (const sx of [-1, 1]) p.add('trim', xf(new THREE.BoxGeometry(0.06, 0.22, 0.6), sx * (sideX(0.3, 0.55) - 0.01), 0.55, zOf(0.3), 0, sx * 0.12));
+  }
+  if (F.glow) {
+    for (const sx of [-1, 1]) {
+      p.box('glow', 0.02, 0.025, L * 0.72, sx * (sideX(0.5, 0.42) + 0.006), 0.42, 0.05);
+      p.add('glow', xf(new THREE.BoxGeometry(0.03, 0.02, 0.9), sx * 0.32, topY(0.85) + 0.01, zOf(0.85), -Math.atan(slope(0.85)), sx * 0.35));
+    }
   }
   if (F.chromeStrip) for (const sx of [-1, 1]) p.box('chrome', 0.02, 0.03, L * 0.6, sx * (sideX(0.5, 0.58) + 0.005), 0.58, 0.05);
   if (F.gills) for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) p.add('chrome', xf(new THREE.BoxGeometry(0.02, 0.16, 0.025), sx * (sideX(0.7, 0.6) + 0.005), 0.6, zOf(0.7) - k * 0.07, 0.35));
@@ -856,9 +915,9 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
 
   const meshes = p.build({
     paint, glass: mats.glass, trim: mats.trim, carbon: mats.carbon, chrome: mats.chrome, stripe,
-    head: headMat, tail: tailMat, amber: amberMat, rim: mats.rimMats.gunmetal,
+    head: headMat, tail: tailMat, amber: amberMat, rim: mats.rimMats.gunmetal, glow: glowMat,
   }, body);
-  for (const k of ['head', 'tail', 'amber']) if (meshes[k]) meshes[k].castShadow = false;
+  for (const k of ['head', 'tail', 'amber', 'glow']) if (meshes[k]) meshes[k].castShadow = false;
   if (meshes.paint) meshes.paint.receiveShadow = true;
 
   // decals: racing numbers, licence plate
@@ -900,7 +959,7 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
   return {
     root, body, wheels, paint, tailMat, headMat, exhausts, shadow,
     length: L, wheelR: wr, halfBase, rideY: S.rideY,
-    ownMaterials: [paint, stripe, headMat, tailMat, amberMat, shadow.material, ...decals],
+    ownMaterials: [paint, stripe, headMat, tailMat, amberMat, glowMat, shadow.material, ...decals],
     setBrake(on) { tailMat.color.setHex(0xff1028).multiplyScalar(on ? 7 : 2.5); },
     setGhost(on) { root.visible = on ? (Math.floor(performance.now() / 90) % 2 === 0) : true; },
   };

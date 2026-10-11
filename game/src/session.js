@@ -11,7 +11,7 @@ import { buildCar, disposeCar } from './carModel.js';
 import { Effects } from './fx.js';
 import { RaceTracker } from './race.js';
 import { BoostSystem, RULES, isNearMiss, isDrafting, classifyImpact, isPushTakedown, isWallCrash } from './burnout.js';
-import { CARS, PAINTS, BASE_PAINTS, AI_NAMES, AI_COUNT, LAPS } from './config.js';
+import { CARS, PAINTS, BASE_PAINTS, AI_NAMES, LAPS, CAR_COUNT, clampCars } from './config.js';
 import { wrapAngle } from './trackMath.js';
 import { PickupState, layoutPickups, strikeTarget, stepShot, inBox, aiWantsPower, POWERS, PICKUP_RULES, AI_POWER } from './powerups.js';
 import { PickupVisuals } from './pickups.js';
@@ -83,10 +83,13 @@ export class RaceSession {
     const aiAggro = [0.3, 0.7, 0.2, 0.85, 0.5, 0.4, 0.6];
     const humanPaints = humanDefs.map((h) => h.paintIndex);
     const paints = shuffle(PAINTS.slice(0, BASE_PAINTS).filter((p, i) => !humanPaints.includes(i)), rand);
-    const numbers = shuffle([3, 7, 11, 13, 21, 44, 77, 88, 99], rand);
+    const numbers = shuffle([3, 7, 11, 13, 21, 44, 77, 88, 99, 5, 23, 61], rand);
     const refTop = humanDefs.reduce((a, h) => a + CARS[h.carIndex].topSpeed, 0) / humanDefs.length;
-    const humanSlots = humanDefs.length > 1 ? [4, 5] : [5];
-    const aiCount = AI_COUNT + 1 - humanDefs.length;
+    // grid size: opts.cars (players + AI); the players start mid-pack (slots 4 and 5 of 8)
+    const total = Math.max(humanDefs.length, clampCars(opts.cars ?? CAR_COUNT.def));
+    const last = total - 1;
+    const humanSlots = humanDefs.length > 1 ? [Math.min(4, last - 1), Math.min(5, last)] : [Math.min(5, last)];
+    const aiCount = total - humanDefs.length;
     const L = this.track.length;
     this.cars = [];
     this.humans = [];

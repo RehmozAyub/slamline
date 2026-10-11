@@ -281,7 +281,14 @@ export class Shortcut {
       if (s < a - 30 || s > b + 30) continue;
       const bx = track.x[i] + track.rx[i] * side * (hw + 0.5), bz = track.z[i] + track.rz[i] * side * (hw + 0.5);
       path.project(bx, bz, -1, q);
-      if (q.beyond === 0 && q.s > 3 && q.s < path.length - 3) near[i] = Math.abs(q.lateral) - shw;
+      if (q.beyond === 0 && q.s > 3 && q.s < path.length - 3) {
+        near[i] = Math.abs(q.lateral) - shw;
+        // a barrier point beyond the shortcut's far edge (the shortcut runs inside the main road
+        // here) stays: nothing lies past it, and the physics keeps the wall there too
+        const blat = q.lateral;
+        const c = path.project(track.x[i], track.z[i], q.idx, {});
+        if (near[i] > 0 && Math.sign(blat) !== Math.sign(c.lateral)) near[i] = Infinity;
+      }
       if (near[i] < G.gapIn) this.mainGap[i] = 1;
     }
     // widen each gap a touch so no post sticks out into the fork (only next to the shortcut)
