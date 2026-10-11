@@ -65,14 +65,14 @@ body.menu-cursor #ui .screen.show { pointer-events: auto; }
 
 /* ---------- track cards ---------- */
 #s-tracks { background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.7)); }
-.cards { position: absolute; left: 50%; top: 17vh; transform: translateX(-50%); display: grid; grid-template-columns: repeat(4, 21vw); gap: 2.4vh 1.5vw; }
-.card { width: 21vw; height: 30vh; position: relative; transform: skewX(-8deg) scale(0.92); transition: all 0.25s cubic-bezier(.2,.9,.2,1); cursor: pointer; opacity: 0.6; overflow: hidden;
+.cards { position: absolute; left: 50%; top: 17vh; transform: translateX(-50%); display: grid; grid-template-columns: repeat(5, 17vw); gap: 2.4vh 1.2vw; }
+.card { width: 17vw; height: 30vh; position: relative; transform: skewX(-8deg) scale(0.92); transition: all 0.25s cubic-bezier(.2,.9,.2,1); cursor: pointer; opacity: 0.6; overflow: hidden;
   border: 0.25vh solid rgba(255,255,255,0.15); background: #111; }
 .card.sel { transform: skewX(-8deg) scale(1.02); opacity: 1; border-color: #fff; box-shadow: 0 0 5vh rgba(255, 80, 60, 0.4); }
 .card .art { position: absolute; inset: 0; }
 .card .info { position: absolute; left: 0; right: 0; bottom: 0; padding: 2vh 3vh 2.2vh; background: linear-gradient(0deg, rgba(0,0,0,0.9), rgba(0,0,0,0)); transform: skewX(8deg); }
 .card .num { font-size: 2vh; opacity: 0.6; letter-spacing: 0.3em; }
-.card .name { font-size: 4vh; font-style: italic; font-variation-settings: 'wdth' 75, 'wght' 700; line-height: 1; margin: 0.5vh 0 1vh; }
+.card .name { font-size: 3.4vh; font-style: italic; font-variation-settings: 'wdth' 75, 'wght' 700; line-height: 1; margin: 0.5vh 0 1vh; }
 .card .tag { font-size: 1.9vh; opacity: 0.8; }
 .card .meta { display: flex; gap: 1.2vh; margin-top: 1.6vh; }
 .card .meta span { font-size: 1.5vh; padding: 0.4vh 1vh; background: rgba(255,255,255,0.12); letter-spacing: 0.1em; }
@@ -122,6 +122,14 @@ body.menu-cursor #ui .screen.show { pointer-events: auto; }
   linear-gradient(0deg, #46505a 0 100%) 55% 100% / 13% 70% no-repeat, linear-gradient(0deg, #e8e0cc 0 100%) 69% 100% / 11% 84% no-repeat,
   linear-gradient(0deg, #3a2a24 0 100%) 81% 100% / 14% 76% no-repeat;
   clip-path: polygon(4% 100%, 4% 40%, 10% 26%, 17% 40%, 18% 100%, 18% 24%, 23% 14%, 29% 24%, 30% 100%, 30% 45%, 36% 34%, 42% 45%, 43% 100%, 43% 18%, 49% 8%, 54% 18%, 55% 100%, 55% 42%, 61% 30%, 68% 42%, 69% 100%, 69% 26%, 74% 16%, 80% 26%, 81% 100%, 81% 36%, 88% 24%, 95% 36%, 95% 100%); }
+.c-airport .art { background:
+  linear-gradient(180deg, #3a7ad0 0%, #8abce8 40%, #cfe0f0 52%, #6a8a46 53%, #5a7a3c 66%, #3c3e44 67%, #3c3e44 84%, #6a8a46 85%); }
+.c-airport .art::after { content: ''; position: absolute; left: 0; right: 0; top: 22%; height: 46%; background:
+  linear-gradient(90deg, transparent 0 10%, #f2f4f6 10% 58%, transparent 58%) 0 34% / 100% 9% no-repeat,
+  linear-gradient(90deg, transparent 0 28%, #f2f4f6 28% 42%, transparent 42%) 0 30% / 100% 26% no-repeat,
+  linear-gradient(90deg, transparent 0 52%, #d01828 52% 58%, transparent 58%) 0 18% / 100% 20% no-repeat,
+  repeating-linear-gradient(90deg, #f4f4f4 0 4%, transparent 4% 9%) 0 92% / 100% 3% no-repeat;
+  transform: rotate(-8deg); }
 .c-space .art { background:
   radial-gradient(circle at 26% 62%, #f0d8b0 0 9%, #c8875a 14%, #8a4a32 20%, rgba(0,0,0,0) 21%),
   radial-gradient(ellipse at 26% 62%, rgba(0,0,0,0) 0 22%, rgba(230,205,170,0.55) 23% 27%, rgba(0,0,0,0) 28%),
@@ -545,7 +553,7 @@ body.touch #tc.on { display: block; position: absolute; inset: 0; pointer-events
 /* --- online: name, join, lobby --- */
 #s-online, #s-join, #s-lobby { background: rgba(0,0,0,0.72); }
 #s-online .menu, #s-join .menu { position: absolute; left: 6vw; top: 42vh; }
-#s-lobby .menu { position: absolute; left: 6vw; top: 52vh; }
+#s-lobby .menu { position: absolute; left: 6vw; top: 56vh; }
 .menu .item.off { opacity: 0.4; }
 .o-field { position: absolute; left: 6vw; top: 22vh; display: flex; flex-direction: column; gap: 1vh; pointer-events: auto; }
 .o-field span { font-size: 2.2vh; letter-spacing: 0.2em; opacity: 0.7; }
@@ -559,13 +567,15 @@ body.touch #tc.on { display: block; position: absolute; inset: 0; pointer-events
 .o-room { position: absolute; left: 6vw; top: 17vh; font-size: 2.6vh; letter-spacing: 0.2em; opacity: 0.9; display: flex; align-items: baseline; gap: 2vh; }
 .o-room b { font-size: 8vh; letter-spacing: 0.35em; color: var(--yellow); font-style: italic; font-variation-settings: 'wdth' 75, 'wght' 900; }
 .o-room em { font-style: normal; font-size: 2vh; opacity: 0.7; }
-.o-players { position: absolute; left: 6vw; top: 31vh; display: flex; gap: 2vw; }
-.o-card { position: relative; min-width: 34vh; padding: 1.6vh 2.4vh 1.6vh 3.4vh; background: var(--panel); border-left: 0.6vh solid var(--hot); display: flex; flex-direction: column; gap: 0.4vh; }
+.o-players { position: absolute; left: 6vw; right: 6vw; top: 29vh; display: flex; flex-wrap: wrap; gap: 1.2vh 1.2vw; }
+.o-card { position: relative; width: 30vh; padding: 1vh 2vh 1vh 3vh; background: var(--panel); border-left: 0.6vh solid var(--hot); display: flex; flex-direction: column; gap: 0.4vh; }
 .o-card i { position: absolute; left: 0; top: 0; bottom: 0; width: 1.2vh; }
-.o-card b { font-size: 3.6vh; font-style: italic; font-variation-settings: 'wdth' 75, 'wght' 800; letter-spacing: 0.04em; }
+.o-card b { font-size: 3vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; font-variation-settings: 'wdth' 75, 'wght' 800; letter-spacing: 0.04em; }
 .o-card span { font-size: 1.8vh; letter-spacing: 0.2em; opacity: 0.6; }
 .o-card em { font-style: normal; font-size: 2.2vh; color: var(--yellow); }
 .o-card.empty { border-left-color: rgba(255,255,255,0.2); justify-content: center; }
 .o-card.empty b { opacity: 0.45; font-size: 2.8vh; }
 .o-hudping { position: absolute; right: calc(2vh + var(--sr, 0px)); bottom: 0.6vh; z-index: 3; font-size: 1.7vh; letter-spacing: 0.12em; opacity: 0; color: rgba(255,255,255,0.75); transition: opacity 0.3s; }
 .o-hudping.show { opacity: 1; }
+.o-card.me { border-left-color: var(--cyan); }
+#s-lobby .o-msg { bottom: 5vh; }

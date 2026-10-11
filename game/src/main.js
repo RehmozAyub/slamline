@@ -21,7 +21,7 @@ import { TouchControls } from './touch.js';
 
 // setTimeout (not rAF) so loading also progresses when the window is hidden
 const IS_DESKTOP = /Electron/i.test(navigator.userAgent);
-const TRACK_COLS = 4; // track cards per row (style.css .cards)
+const TRACK_COLS = 5; // track cards per row (style.css .cards)
 const nextFrame = () => new Promise((r) => setTimeout(r, 20));
 
 // the GPU's name (for GRAPHICS AUTO), from a throwaway context

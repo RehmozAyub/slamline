@@ -21,6 +21,7 @@ const CAR_DEFS = [
   { id: 'titan', name: 'TITAN', desc: 'Muscle brute. Wins every shoving match.', style: 'muscle', points: { speed: 7, accel: 6, handling: 5, strength: 7 } },
   { id: 'phantom', name: 'PHANTOM', desc: 'Hypercar. Blistering top end, light on its feet.', style: 'hyper', points: { speed: 9, accel: 7, handling: 6, strength: 3 } },
   { id: 'rogue', name: 'ROGUE', desc: 'Lifted rally hatch. Loves to slide.', style: 'rally', points: { speed: 6, accel: 7, handling: 7, strength: 4 } },
+  { id: 'jetstream', name: 'JETSTREAM', desc: 'Fighter-jet styling. Owns the long straights.', style: 'jet', points: { speed: 9, accel: 6, handling: 5, strength: 4 } },
   { id: 'pulsar', name: 'PULSAR', desc: 'Starfighter on wheels. Glides through fast bends.', style: 'star', points: { speed: 7, accel: 7, handling: 7, strength: 3 } },
 ];
 
