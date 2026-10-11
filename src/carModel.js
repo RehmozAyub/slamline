@@ -831,7 +831,6 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
   else if (F.exhaust === 'afterburner') { // one big nozzle with a hot orange core
     ex(0, 0.5, 0.26, 18);
     p.tube('burner', 0.2, 0.02, 18, 0, 0.5, tz - 0.13);
-    for (let k = 0; k < 10; k++) p.add('trim', xf(new THREE.BoxGeometry(0.03, 0.12, 0.2), Math.sin((k / 10) * Math.PI * 2) * 0.27, 0.5 + Math.cos((k / 10) * Math.PI * 2) * 0.27, tz - 0.05, 0, 0, (k / 10) * Math.PI * 2));
   }
   else if (F.exhaust === 'thrusters') { // two big nozzles with a glowing core
     for (const sx of [-1, 1]) {
@@ -870,8 +869,8 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
     const u = 0.08, y0 = topY(u);
     const fin = new THREE.Shape([new THREE.Vector2(0.1, 0), new THREE.Vector2(0.95, 0), new THREE.Vector2(0.45, 0.62), new THREE.Vector2(0.15, 0.62)]);
     const fg = new THREE.ExtrudeGeometry(fin, { depth: 0.05, bevelEnabled: false });
-    fg.rotateY(Math.PI / 2);
-    fg.translate(-0.025, y0 - 0.02, zOf(u) - 0.45);
+    fg.rotateY(-Math.PI / 2); // shape x runs forward along the rear deck, swept back
+    fg.translate(0.025, y0 - 0.02, zOf(u) - 0.05);
     p.add('paint', fg);
     for (const sx of [-1, 1]) p.add('carbon', xf(new THREE.BoxGeometry(0.62, 0.035, 0.42), sx * 0.5, y0 + 0.02, zOf(u) - 0.1, 0, sx * 0.35, sx * 0.08));
     p.box('burner', 0.03, 0.06, 0.06, 0, y0 + 0.6, zOf(u) - 0.1); // a light on the fin tip
