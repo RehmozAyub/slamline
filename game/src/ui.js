@@ -16,13 +16,13 @@ export class UI {
     root.innerHTML = /* html */ `
       <div id="fade"></div>
       <section id="s-loading" class="screen show">
-        <div class="logo"><span class="l1">APEX</span><span class="l2">RUSH</span></div>
+        <div class="logo"><span class="l1">SLAM</span><span class="l2">LINE</span></div>
         <div class="loadbar"><i></i></div>
         <div class="loadtext">WARMING UP ENGINES</div>
       </section>
 
       <section id="s-title" class="screen">
-        <div class="logo big"><span class="l1">APEX</span><span class="l2">RUSH</span></div>
+        <div class="logo big"><span class="l1">SLAM</span><span class="l2">LINE</span></div>
         <div class="tagline">TAKEDOWN RACING</div>
         <div class="menu" id="m-title"></div>
         <div class="press">PRESS ENTER</div>

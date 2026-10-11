@@ -1,9 +1,11 @@
-// Electron shell for APEX RUSH: serves the game from a privileged app:// protocol
+// Electron shell for SLAMLINE (formerly APEX RUSH): serves the game from a privileged app:// protocol
 // (ES modules don't load reliably from file://) and prefers the discrete GPU.
 const { app, BrowserWindow, protocol, net, Menu, session } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
+// keep the settings / progress folder from when the game was called APEX RUSH
+if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), 'ApexRush'));
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('force_high_performance_gpu');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -34,7 +36,7 @@ app.whenReady().then(async () => {
     width: 1600,
     height: 900,
     backgroundColor: '#000000',
-    title: 'APEX RUSH',
+    title: 'SLAMLINE',
     show: false,
     autoHideMenuBar: true,
     webPreferences: { backgroundThrottling: false },

@@ -1,4 +1,4 @@
-// Packages the game as a portable Windows exe: release/ApexRush.exe
+// Packages the game as a portable Windows exe: release/Slamline.exe
 // Build happens in %LOCALAPPDATA%\ApexRushBuild so node_modules never syncs to Google Drive.
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync, statSync } from 'node:fs';
@@ -30,7 +30,7 @@ copyFileSync(join(root, 'electron', 'icon.png'), join(build, 'icon.png'));
 console.log('Running electron-builder...');
 run('npx electron-builder --win portable --x64');
 
-const exe = join(build, 'dist', 'ApexRush.exe');
+const exe = join(build, 'dist', 'Slamline.exe');
 mkdirSync(join(root, 'release'), { recursive: true });
-copyFileSync(exe, join(root, 'release', 'ApexRush.exe'));
-console.log(`\nBuilt release/ApexRush.exe (${(statSync(exe).size / 1048576).toFixed(1)} MB)`);
+copyFileSync(exe, join(root, 'release', 'Slamline.exe'));
+console.log(`\nBuilt release/Slamline.exe (${(statSync(exe).size / 1048576).toFixed(1)} MB)`);

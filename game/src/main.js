@@ -1,4 +1,4 @@
-// APEX RUSH - boot, menus, game-state machine and main loop.
+// SLAMLINE (formerly APEX RUSH) - boot, menus, game-state machine and main loop.
 import * as THREE from 'three';
 import { Renderer } from './renderer.js';
 import { Input, keyPlayer } from './input.js';
