@@ -293,15 +293,16 @@ body.menu-cursor #ui .screen.show { pointer-events: auto; }
 .howto .note { margin-top: 2vh; font-size: 1.8vh; opacity: 0.7; }
 
 /* ---------- results ---------- */
-.results { position: absolute; left: 50%; top: 18vh; transform: translateX(-50%); width: 110vh; }
-.rrow { display: grid; grid-template-columns: 8vh 1fr 15vh 15vh 15vh 13vh; align-items: center; padding: 1.3vh 3vh; margin-bottom: 0.8vh; font-size: 2.8vh; background: var(--panel); transform: skewX(-12deg);
+/* rows shrink to fit: --n (set by ui.js) = how many rows; the board keeps clear of the menu */
+.results { position: absolute; left: 50%; top: 18vh; transform: translateX(-50%); width: 110vh; --rowh: min(6.4vh, calc(58vh / (var(--n, 8) + 0.5))); }
+.rrow { display: grid; grid-template-columns: 8vh 1fr 15vh 15vh 15vh 13vh; align-items: center; height: var(--rowh); padding: 0 3vh; margin-bottom: calc(var(--rowh) * 0.12); font-size: calc(var(--rowh) * 0.44); background: var(--panel); transform: skewX(-12deg);
   animation: slideIn 0.4s cubic-bezier(.2,.9,.2,1) both; font-variant-numeric: tabular-nums; }
 .rrow > * { transform: skewX(12deg); }
-.rrow.hdr { background: none; font-size: 1.6vh; letter-spacing: 0.25em; opacity: 0.7; animation: none; }
+.rrow.hdr { background: none; height: auto; padding-bottom: 0.6vh; font-size: 1.6vh; letter-spacing: 0.25em; opacity: 0.7; animation: none; }
 .rrow.me { background: var(--grad); }
-.rrow .p { font-size: 3.6vh; font-variation-settings: 'wdth' 75, 'wght' 700; }
+.rrow .p { font-size: calc(var(--rowh) * 0.56); font-variation-settings: 'wdth' 75, 'wght' 700; }
 .rrow .n { display: flex; align-items: center; gap: 1.4vh; font-variation-settings: 'wdth' 75, 'wght' 700; }
-.rrow .n i { width: 1.2vh; height: 2.6vh; background: var(--c); transform: skewX(-14deg); }
+.rrow .n i { width: 1.2vh; height: calc(var(--rowh) * 0.42); background: var(--c); transform: skewX(-14deg); }
 .rrow:nth-child(2) { animation-delay: 0.05s; } .rrow:nth-child(3) { animation-delay: 0.1s; } .rrow:nth-child(4) { animation-delay: 0.15s; }
 .rrow:nth-child(5) { animation-delay: 0.2s; } .rrow:nth-child(6) { animation-delay: 0.25s; } .rrow:nth-child(7) { animation-delay: 0.3s; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(6vh) skewX(-12deg); } }
@@ -397,7 +398,7 @@ body.touch .howto { top: 17vh; bottom: 3vh; overflow-y: auto; touch-action: pan-
 body.touch .howto h2 { font-size: 3.4vh; }
 body.touch .howto p { font-size: 3vh; }
 body.touch .howto .picon { width: 4vh; height: 4vh; }
-body.touch .rrow { padding: 0.8vh 3vh; margin-bottom: 0.6vh; }
+body.touch .rrow { padding: 0 3vh; }
 body.touch .rrow.hdr { font-size: 2.2vh; }
 body.touch #s-results .menu { bottom: 3vh; }
 body.touch .r-extra span { font-size: 2.4vh; }
