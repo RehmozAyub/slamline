@@ -373,7 +373,7 @@ function liveryTexture(styleId, S, paintHex) {
     side(() => {
       poly([[fa + 0.6, -0.1], [fa - 0.1, 0.14], [ra - 0.1, 0.3], [ra + 0.7, 0.12], [fa - 0.5, -0.02]], pal.light);
       poly([[fa + 0.35, -0.2], [fa - 0.3, -0.08], [ra + 0.4, 0.02], [ra + 1.1, -0.08], [fa - 0.7, -0.17]], pal.accent);
-      text('APEX', ra + 0.65, -0.2, 0.15, pal.light, { stroke: 'rgba(0,0,0,0.35)' });
+      text('SLAM', ra + 0.65, -0.2, 0.15, pal.light, { stroke: 'rgba(0,0,0,0.35)' });
     });
   } else if (styleId === 'gt') { // BOLT: double coach pinstripe and a small script badge
     const gold = pal.lum > 0.55 ? '#6a4a10' : '#e0b860';
