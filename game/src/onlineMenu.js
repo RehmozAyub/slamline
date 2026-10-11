@@ -42,14 +42,14 @@ export class OnlineFlow {
     const add = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); const el = t.content.firstChild; root.insertBefore(el, root.querySelector('#rotate')); this.ui.screens[el.id.slice(2)] = el; return el; };
     add(`<section id="s-online" class="screen">
       <h1 class="head"><b>ONLINE</b> RACE</h1>
-      <label class="o-field"><span>YOUR NAME</span><input id="o-name" maxlength="${NAME_MAX}" spellcheck="false" autocomplete="off" placeholder="TYPE A NAME"></label>
+      <label class="o-field"><span>YOUR NAME</span><input id="o-name" type="text" maxlength="${NAME_MAX}" spellcheck="false" autocomplete="off" autocapitalize="characters" enterkeyhint="done" placeholder="TYPE A NAME"></label>
       <div class="menu" id="m-online"></div>
       <div class="o-msg" id="o-msg"></div>
       <div class="hints">TYPE YOUR NAME &nbsp;·&nbsp; ↑ ↓ SELECT &nbsp;·&nbsp; ENTER CONFIRM &nbsp;·&nbsp; ESC BACK</div>
     </section>`);
     add(`<section id="s-join" class="screen">
       <h1 class="head"><b>JOIN</b> A FRIEND</h1>
-      <label class="o-field code"><span>ROOM CODE</span><input id="o-code" maxlength="4" spellcheck="false" autocomplete="off" placeholder="····"></label>
+      <label class="o-field code"><span>ROOM CODE</span><input id="o-code" type="text" maxlength="4" spellcheck="false" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="····"></label>
       <div class="menu" id="m-join"></div>
       <div class="o-msg" id="o-jmsg"></div>
       <div class="hints">TYPE THE 4-LETTER CODE YOUR FRIEND SEES &nbsp;·&nbsp; ENTER JOIN &nbsp;·&nbsp; ESC BACK</div>
