@@ -352,6 +352,7 @@ export class UI {
   // (re)fill the results table; rows already shown are updated in place (no re-animation)
   resultRows(list) {
     const el = $('#results');
+    el.style.setProperty('--n', list.length); // rows shrink to fit (style.css)
     const cells = (r) => `<span class="p">${r.pos}</span><span class="n"><i></i>${r.name}</span><span>${r.car}</span>
         <span>${r.time !== null ? formatTime(r.time) : '—'}</span><span>${formatTime(r.best)}</span><span>${r.takedowns ?? ''}</span>`;
     const rows = el.querySelectorAll('.rrow:not(.hdr)');
