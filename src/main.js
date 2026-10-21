@@ -14,7 +14,7 @@ import { MAPS } from './maps/index.js';
 import { TrackPath } from './trackMath.js';
 import { CARS, PAINTS, QUALITY, QUALITY_ORDER, QUALITY_CHOICES, IS_MOBILE, IS_APP, STEERING, STEERING_LABEL, autoQuality, loadSettings, saveSettings, clampCars } from './config.js';
 import { formatTime } from './race.js';
-import { recordRace, discoverSignature, unlockedPaints, unlockText, STARS } from './progress.js';
+import { recordRace, discoverSignature, unlockedPaints, unlockText, paintProgress, STARS } from './progress.js';
 import { SIGNATURE_KINDS } from './signatures.js';
 import { OnlineFlow } from './onlineMenu.js';
 import { TouchControls } from './touch.js';
@@ -139,6 +139,7 @@ class Game {
     for (const w of model.wheels) if (w.front) w.group.rotation.y = -0.35;
     this.world.scene.add(model.root);
     this.showroom = model;
+    this.showroomPaint = pick.paint;
     this.showroomCar = { x: p.x, y: p.y, z: p.z, heading: p.heading };
   }
 
@@ -235,7 +236,18 @@ class Game {
   // cars per race (Settings); online races use the host's choice
   carCount() { return clampCars(this.settings.cars); }
 
-  showCars(pick = 0) {
+  async showCars(pick = 0) {
+    // the picked track's scenery is built once, on the way into the car screen (browsing the
+    // track cards never reloads anything); RANDOM keeps the current scenery
+    const want = MAPS[this.sel.track];
+    if (pick === 0 && want && !this.onlineFlow.active && (!this.world || this.world.def !== want)) {
+      this.state = 'loading';
+      this.ui.fade(true);
+      await new Promise((r) => setTimeout(r, 300));
+      await this.loadWorld(this.sel.track);
+      this.audio.playMusic(want.id);
+      this.ui.fade(false);
+    }
     this.state = 'cars';
     this.carPick = pick;
     this.ui.show('cars');
@@ -497,7 +509,7 @@ class Game {
         else this.sel.track = t - C >= 0 ? t - C : n;
         this.ui.trackCards(MAPS, this.sel.track, this.trackLengths, this.trackProgress(), this.carCount());
         this.audio.blip(600, 0.03, 0.06);
-        this.previewTrack();
+        this.previewMusic();
       }
       if (a === 'confirm') { this.audio.blip(900, 0.06, 0.1); this.showCars(); }
       if (a === 'back') this.showTitle();
@@ -509,7 +521,7 @@ class Game {
         let p = pick.paint;
         do p = (p + (a === 'up' ? -1 : 1) + PAINTS.length) % PAINTS.length; while (!open[p]);
         pick.paint = p;
-        this.refreshCar();
+        this.repaint();
       }
       if (a === 'confirm' && code !== 'Space') this.confirmCar();
       if (a === 'back') { if (this.onlineFlow.active) this.onlineFlow.carChosen(); else if (this.carPick === 1) this.showCars(0); else this.showTracks(); }
@@ -586,26 +598,40 @@ class Game {
     } else this.quitToMenu();
   }
 
-  previewTrack() {
+  // browsing the track cards: the highlighted track's music comes in once you settle on it
+  previewMusic() {
     clearTimeout(this.previewTimer);
-    if (this.randomPick()) return; // RANDOM: keep the current scenery, the pick happens at the start
-    this.previewTimer = setTimeout(async () => {
-      if (this.state !== 'tracks' && this.state !== 'cars') return;
-      this.ui.fade(true);
-      await new Promise((r) => setTimeout(r, 300));
-      await this.loadWorld(this.sel.track);
-      this.audio.playMusic(MAPS[this.sel.track].id);
-      this.ui.fade(false);
-    }, 350);
+    if (this.randomPick()) return;
+    this.previewTimer = setTimeout(() => {
+      if (this.state === 'tracks' && !this.randomPick()) this.audio.playMusic(MAPS[this.sel.track].id);
+    }, 450);
   }
-
   refreshCar(sound = true) {
     if (sound) this.audio.blip(600, 0.03, 0.06);
     const pick = this.pickSel();
     const who = this.players > 1 ? `PLAYER ${this.carPick + 1}` : '';
     if (!this.paintOpen()[pick.paint]) pick.paint = 0;
-    this.ui.carPanel(CARS[pick.car], PAINTS, pick.paint, pick.car, CARS.length, who, this.paintOpen(), unlockText);
+    this.ui.carPanel(CARS[pick.car], PAINTS, pick.paint, pick.car, CARS.length, who, this.paintOpen(), unlockText, this.paintProgressOf);
     if (this.world) this.buildShowroom();
+  }
+
+  paintProgressOf = (p) => paintProgress(this.settings.progress, p);
+
+  // a new paint: the showroom car is recoloured on the spot (no rebuild) with a quick sheen
+  repaint(sound = true) {
+    if (sound) this.audio.blip(760, 0.03, 0.07);
+    const pick = this.pickSel();
+    this.ui.paintPanel(PAINTS, pick.paint, this.paintOpen(), unlockText, this.paintProgressOf);
+    this.showPaint(pick.paint);
+  }
+
+  // show paint i on the showroom car (hovering a chip previews it)
+  showPaint(i) {
+    const p = PAINTS[i];
+    if (!this.showroom || this.showroomPaint === i) return;
+    this.showroom.setPaint(p.hex, p.finish);
+    this.showroomPaint = i;
+    this.paintFlash = 1;
   }
 
   bindMouse() {
@@ -629,15 +655,30 @@ class Game {
       if (!c) return;
       const i = Number(c.dataset.i);
       if (i === this.sel.track) this.showCars();
-      else { this.sel.track = i; this.ui.trackCards(MAPS, i, this.trackLengths, this.trackProgress(), this.carCount()); this.previewTrack(); }
+      else { this.sel.track = i; this.ui.trackCards(MAPS, i, this.trackLengths, this.trackProgress(), this.carCount()); this.audio.blip(600, 0.03, 0.06); this.previewMusic(); }
     });
-    document.getElementById('swatches').addEventListener('click', (e) => {
-      const s = e.target.closest('i');
-      if (!s) return;
-      const i = Number(s.dataset.i);
-      if (!this.paintOpen()[i]) { document.getElementById('paintname').textContent = `LOCKED · ${unlockText(PAINTS[i])}`; this.audio.blip(300, 0.06, 0.08); return; }
+    // paint chips: click (tap) picks one; with a mouse, hovering one shows it on the car
+    const swatches = document.getElementById('swatches');
+    const chipOf = (e) => { const s = e.target.closest('i'); return s ? Number(s.dataset.i) : null; };
+    swatches.addEventListener('click', (e) => {
+      const i = chipOf(e);
+      if (i === null) return;
+      if (!this.paintOpen()[i]) { this.ui.paintInfo(PAINTS, i, false, unlockText, this.paintProgressOf); this.audio.blip(300, 0.06, 0.08); return; }
       this.pickSel().paint = i;
-      this.refreshCar();
+      this.repaint();
+    });
+    swatches.addEventListener('pointerover', (e) => {
+      const i = chipOf(e);
+      if (i === null || e.pointerType === 'touch') return;
+      const open = this.paintOpen()[i];
+      this.ui.paintInfo(PAINTS, i, open, unlockText, this.paintProgressOf);
+      if (open) this.showPaint(i);
+    });
+    swatches.addEventListener('pointerleave', () => {
+      if (this.state !== 'cars') return;
+      const i = this.pickSel().paint;
+      this.ui.paintInfo(PAINTS, i, true, unlockText, this.paintProgressOf);
+      this.showPaint(i);
     });
     for (const [k, d] of [[0, -1], [1, 1]]) {
       document.querySelectorAll('.carnav .arrow')[k].addEventListener('click', () => { const p = this.pickSel(); p.car = (p.car + d + CARS.length) % CARS.length; this.refreshCar(); });
@@ -742,7 +783,12 @@ class Game {
         if (!(this.session.online && this.onlineFlow.lastResults)) this.ui.resultRows(list);
       }
     } else if (this.world && this.showroomCar) {
-      this.rig.updateOrbit(realDt, this.showroomCar, this.time);
+      // on the car screen the car sits to the right of the panel
+      this.rig.updateOrbit(realDt, this.showroomCar, this.time, this.state === 'cars' ? 1 : 0);
+      if (this.showroom && this.paintFlash > 0.01) {
+        this.paintFlash *= Math.exp(-realDt * 7);
+        this.showroom.paint.emissive.setScalar(this.paintFlash * 0.3); // sheen of fresh paint
+      }
       this.world.update(realDt, this.time, this.showroomCar, cam);
       const fx = this.renderer.fx;
       fx.blur = 0; fx.lines = 0; fx.ca = 0; fx.boost = 0; fx.flash = 0; fx.slowmo = 0;
