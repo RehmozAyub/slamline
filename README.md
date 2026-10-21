@@ -53,7 +53,10 @@ node --test tests/logic.test.js
 node tools/build.mjs         # builds release/Slamline.exe with Electron
 node tools/build-apk.mjs     # builds release/Slamline.apk (set SLAMLINE_VERSION=2.5 for the version name)
 node tools/make-icon.mjs     # redraws every icon (exe, web app, Android launcher)
+npm run release              # ships the committed main everywhere (see below)
 ```
+
+`npm run release` checks that main is committed and up to date, runs the tests, builds the exe and the apk, then pushes main, publishes `game/` to the Pages site and creates the next GitHub release (v2.5 → v2.6) with both files. Nothing goes public unless both builds succeed. Options: `-- --notes "summary"` for the top of the release notes, `-- --version 3.0` to pick the version, `-- --dry-run` to only run the checks and tests and preview the notes.
 
 The Android app (`android/`) is a full-screen WebView that serves the bundled `game/` folder offline. `build-apk.mjs` installs JDK 17, the Android SDK and Gradle into `S:\SlamlineAndroid` the first time it runs (set `SLAMLINE_ANDROID_HOME` to use another folder). It also creates the release signing key in `android/signing/`, which is gitignored. Keep that key: Android only installs an update over the app when it is signed with the same key.
 

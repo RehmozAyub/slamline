@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/logic.test.js tests/net.test.js"
+    "test": "node --test tests/logic.test.js tests/net.test.js",
+    "release": "node tools/release.mjs"
   }
 }
-
