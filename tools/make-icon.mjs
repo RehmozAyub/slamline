@@ -46,6 +46,7 @@ const rounded = (x, y) => {
 const LAYERS = {
   tile: (x, y) => (rounded(x, y) ? mark(x, y) || background(x, y) : [0, 0, 0, 0]),
   bg: (x, y) => background(x, y),
+  square: (x, y) => mark(x, y) || background(x, y), // full bleed: iOS rounds the corners itself
   fg: (x, y) => mark((x - 128) / 0.56 + 128, (y - 128) / 0.56 + 128) || [0, 0, 0, 0],
 };
 
@@ -95,7 +96,7 @@ function out(path, N, layer) {
 out('electron/icon.png', 256, 'tile');
 out('game/icons/icon-192.png', 192, 'tile');
 out('game/icons/icon-512.png', 512, 'tile');
-out('game/icons/apple-touch-icon.png', 180, 'bg');
+out('game/icons/apple-touch-icon.png', 180, 'square');
 const res = 'android/app/src/main/res/';
 for (const [dpi, s] of Object.entries({ mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 })) {
   out(`${res}mipmap-${dpi}/ic_launcher.png`, 48 * s, 'tile');
