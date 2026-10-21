@@ -7,10 +7,11 @@ import jungle from './jungle.js';
 import canal from './canal.js';
 import space from './space.js';
 import airport from './airport.js';
+import volcano from './volcano.js';
 
 coast.weatherLabel ??= 'CLEAR';
 city.weatherLabel ??= 'NIGHT';
 alpine.weatherLabel ??= 'SUNNY';
 
-export const MAPS = [coast, city, alpine, snow, canyon, jungle, canal, space, airport];
+export const MAPS = [coast, city, alpine, snow, canyon, jungle, canal, space, airport, volcano];
 export const MAP_BY_ID = Object.fromEntries(MAPS.map((m) => [m.id, m]));

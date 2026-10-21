@@ -22,6 +22,16 @@ export class CameraRig {
     this.tmp = new THREE.Vector3();
     this.snap = true;
     this.fovScale = 1; // < 1 for the very wide split-screen views
+    this.up = new THREE.Vector3(0, 1, 0); // eases round with the car on a loop
+    this.upTarget = new THREE.Vector3(0, 1, 0);
+  }
+
+  // camera "up": the car's up on a loop, the world's otherwise
+  easeUp(dt, P = null) {
+    if (P) this.upTarget.set(P.ux, P.uy, P.uz); else this.upTarget.set(0, 1, 0);
+    if (this.snap) this.up.copy(this.upTarget);
+    this.up.lerp(this.upTarget, Math.min(1, dt * 9)).normalize();
+    this.cam.up.copy(this.up);
   }
 
   cycle() {
@@ -44,6 +54,8 @@ export class CameraRig {
     const a = car.heading + 2.3 + Math.sin(this.orbit) * 1.1;
     const r = 7.2 + Math.sin(this.orbit * 0.7) * 1.2;
     this.cam.position.set(car.x + Math.sin(a) * r, car.y + 1.7 + Math.sin(this.orbit * 0.5) * 0.5, car.z + Math.cos(a) * r);
+    this.up.set(0, 1, 0);
+    this.cam.up.set(0, 1, 0);
     this.cam.lookAt(car.x, car.y + 0.7, car.z);
     this.cam.fov = 45;
     this.cam.updateProjectionMatrix();
@@ -65,9 +77,32 @@ export class CameraRig {
       this.tmp.set(t.x + Math.sin(c.angle) * r, ty + 2.5 + c.t * 0.6, t.z + Math.cos(c.angle) * r);
       if (c.t < 0.02) cam.position.copy(this.tmp);
       cam.position.lerp(this.tmp, Math.min(1, realDt * 4));
+      this.easeUp(realDt);
       cam.lookAt(t.x, ty, t.z);
       fovTarget = 50;
       if (c.t >= c.duration) { this.crash = null; this.snap = true; }
+    } else if (car.loopPose) {
+      // round a loop: ride the rail behind the car and roll with it
+      const m = MODES[this.mode], P = car.loopPose;
+      this.heading = car.heading; // so the normal chase picks up smoothly at the exit
+      if (m.hood) {
+        this.pos.set(P.x + P.ux * 1.22 + P.tx * 0.4, P.y + P.uy * 1.22 + P.ty * 0.4, P.z + P.uz * 1.22 + P.tz * 0.4);
+        this.look.set(P.x + P.tx * 30 + P.ux, P.y + P.ty * 30 + P.uy, P.z + P.tz * 30 + P.uz);
+      } else {
+        const dist = m.dist + speedRatio * 1.3 - boost * 0.6, h = m.height + speedRatio * 0.2;
+        this.tmp.set(P.x - P.tx * dist + P.ux * h, P.y - P.ty * dist + P.uy * h, P.z - P.tz * dist + P.uz * h);
+        if (this.snap) this.pos.copy(this.tmp);
+        this.pos.lerp(this.tmp, Math.min(1, dt * 14));
+        this.look.set(P.x + P.tx * 5 + P.ux * m.look, P.y + P.ty * 5 + P.uy * m.look, P.z + P.tz * 5 + P.uz * m.look);
+      }
+      this.snap = false;
+      cam.position.copy(this.pos);
+      const s = this.shake * 0.35 + boost * 0.03 + speedRatio * speedRatio * 0.012;
+      cam.position.x += (Math.sin(time * 47) + Math.sin(time * 31)) * s * 0.5;
+      cam.position.y += (Math.sin(time * 53) + Math.sin(time * 23)) * s * 0.5;
+      this.easeUp(dt, P);
+      cam.lookAt(this.look);
+      fovTarget = m.fov + speedRatio * 15 + boost * 7 + 4;
     } else {
       const m = MODES[this.mode];
       // camera heading follows the car with a little lag, and leans into the velocity during drifts
@@ -98,6 +133,7 @@ export class CameraRig {
       const s = this.shake * 0.35 + boost * 0.03 + speedRatio * speedRatio * 0.012;
       cam.position.x += (Math.sin(time * 47) + Math.sin(time * 31)) * s * 0.5;
       cam.position.y += (Math.sin(time * 53) + Math.sin(time * 23)) * s * 0.5;
+      this.easeUp(dt);
       cam.lookAt(this.look);
       if (!m.hood) cam.rotateZ((driftDir || 0) * 0.035 + car.bodyRoll * -0.4);
       fovTarget = m.fov + speedRatio * 15 + boost * 7;

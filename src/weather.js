@@ -1,5 +1,5 @@
 // Weather particles that live in a box around the camera: rain streaks (with lightning),
-// snowflakes, or drifting desert dust.
+// snowflakes, drifting desert dust, or glowing embers rising off lava.
 import * as THREE from 'three';
 import { radialTexture } from './textures.js';
 
@@ -8,7 +8,7 @@ export class Weather {
   constructor(scene, cfg, layer = 1) {
     this.cfg = cfg;
     this.type = cfg.type;
-    this.box = cfg.box || (this.type === 'rain' ? [70, 36, 70] : this.type === 'snow' ? [90, 44, 90] : [140, 30, 140]);
+    this.box = cfg.box || (this.type === 'rain' ? [70, 36, 70] : this.type === 'snow' || this.type === 'embers' ? [90, 44, 90] : [140, 30, 140]);
     const n = this.count = cfg.count;
     this.pos = new Float32Array(n * 3);
     this.phase = new Float32Array(n);
@@ -34,12 +34,14 @@ export class Weather {
       this.pts = new Float32Array(n * 3);
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(this.pts, 3).setUsage(THREE.DynamicDrawUsage));
+      const ember = this.type === 'embers';
       this.mesh = new THREE.Points(g, new THREE.PointsMaterial({
-        color: cfg.color ?? 0xffffff,
-        size: this.type === 'snow' ? 0.22 : 1.6,
+        color: ember ? new THREE.Color(cfg.color ?? 0xff7a2a).multiplyScalar(3) : cfg.color ?? 0xffffff,
+        size: this.type === 'snow' ? 0.22 : ember ? 0.32 : 1.6,
         map: radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)', 64),
         transparent: true,
-        opacity: this.type === 'snow' ? 0.95 : 0.22,
+        opacity: this.type === 'snow' || ember ? 0.95 : 0.22,
+        blending: ember ? THREE.AdditiveBlending : THREE.NormalBlending,
         depthWrite: false,
         sizeAttenuation: true,
       }));
@@ -64,6 +66,7 @@ export class Weather {
       let vx = wind[0], vz = wind[1], vy = -fall;
       if (this.type === 'snow') { vx += Math.sin(time * 0.9 + this.phase[i]) * 0.8; vz += Math.cos(time * 0.7 + this.phase[i]) * 0.8; }
       if (this.type === 'dust') { vy = Math.sin(time * 0.5 + this.phase[i]) * 0.6; }
+      if (this.type === 'embers') { vy = 1.4 + Math.sin(this.phase[i]) * 0.8; vx += Math.sin(time * 1.3 + this.phase[i]) * 1.2; vz += Math.cos(time * 1.1 + this.phase[i]) * 1.2; }
       p[o] += vx * dt; p[o + 1] += vy * dt; p[o + 2] += vz * dt;
       // keep inside the box centred on the camera (positions are world-space)
       let rx = p[o] - c.x, ry = p[o + 1] - c.y, rz = p[o + 2] - c.z;

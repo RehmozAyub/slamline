@@ -69,6 +69,24 @@ function canalHump(x, z) {
 // Every layout is scaled up from its design size (longer laps, room for the shortcuts).
 export const LAYOUT_SCALE = 1.2;
 
+// MAGMA CORE (design-size coordinates): a ring road round the lava lake on the caldera floor,
+// two lava-tube tunnels and a loop-the-loop on the north straight. The loop needs a sideways
+// jog in the road: its exit comes down LOOP_JOG.offset metres (world) to the right of its entry.
+export const VOLCANO = {
+  lake: { x: 0, z: -10, rx: 330, rz: 205 },
+  tunnels: [[[529, 225], [545, 20]], [[-563, -105], [-561, 65]]], // [from, to] along the road
+  roadY: 8,
+};
+export const LOOP_JOG = { along: 74, offset: 24 }; // world metres between the jog's two corners
+const JOG = { x: 120, z: -330 }; // first corner of the jog (the road runs west here)
+const jogTo = { x: JOG.x - LOOP_JOG.along / LAYOUT_SCALE, z: JOG.z - LOOP_JOG.offset / LAYOUT_SCALE };
+function volcanoY(x, z) {
+  // gentle rolls on the caldera floor, dead flat round the loop on the north straight
+  const dx = Math.max(0, Math.abs(x - 60) - 140), dz = Math.max(0, Math.abs(z + 340) - 30);
+  const w = Math.min(1, Math.hypot(dx, dz) / 120);
+  return VOLCANO.roadY + (2.5 * Math.sin(x * 0.006 + 0.8) + 1.8 * Math.cos(z * 0.007)) * w;
+}
+
 const LAYOUTS_BASE = {
   coast: {
     width: 20,
@@ -165,8 +183,28 @@ const LAYOUTS_BASE = {
       () => 0.6,
     ),
   },
+  // MAGMA CORE: round the lava lake; dense points on the straights keep the loop's jog crisp
+  volcano: {
+    width: 20,
+    points: filleted(
+      // north-east, north-west and south the road swings out round rock outcrops (shortcuts cut them)
+      [[520, 285], [560, -120], [600, -310], [440, -430], [300, -330], [JOG.x, JOG.z], [jogTo.x, jogTo.z], [-250, -350], [-400, -450], [-565, -330],
+        [-560, 160], [-430, 300], [-250, 330], [-130, 460], [110, 460], [220, 325]],
+      [100, 90, 70, 70, 70, 3, 3, 70, 60, 70, 80, 90, 70, 70, 70, 70],
+      volcanoY,
+      10,
+    ),
+    loops: [{ from: [JOG.x, JOG.z], to: [jogTo.x, jogTo.z] }],
+    tunnels: VOLCANO.tunnels,
+  },
 };
 
+const scaleXZ = ([x, z]) => [x * LAYOUT_SCALE, z * LAYOUT_SCALE];
 export const LAYOUTS = Object.fromEntries(Object.entries(LAYOUTS_BASE).map(([id, l]) => [
-  id, { ...l, points: l.points.map(([x, y, z]) => [x * LAYOUT_SCALE, y, z * LAYOUT_SCALE]) },
+  id, {
+    ...l,
+    points: l.points.map(([x, y, z]) => [x * LAYOUT_SCALE, y, z * LAYOUT_SCALE]),
+    ...(l.loops ? { loops: l.loops.map((lp) => ({ from: scaleXZ(lp.from), to: scaleXZ(lp.to) })) } : {}),
+    ...(l.tunnels ? { tunnels: l.tunnels.map(([a, b]) => [scaleXZ(a), scaleXZ(b)]) } : {}),
+  },
 ]));

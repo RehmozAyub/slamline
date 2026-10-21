@@ -4,15 +4,18 @@ import { TrackPath } from './trackMath.js';
 import { TrackIndex, CompositeIndex } from './terrain.js';
 import { findShortcuts, shortcutsFromSpecs, ShortcutSet, SHORTCUT } from './shortcut.js';
 import { LAYOUT_SCALE } from './maps/layouts.js';
+import { layoutFeatures } from './loop.js';
 
 // The shortcut search takes about a second per track, so its result ({a, b, side} per shortcut)
 // is kept in localStorage; it only changes if the search rules or layouts change.
 const SC_KEY = 'slamline.shortcuts.' + JSON.stringify([SHORTCUT, LAYOUT_SCALE]).split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7);
-function shortcutsFor(id, track, index) {
+// avoid: main-road stretches no shortcut may touch (a loop, the tunnels); part of the cache key
+function shortcutsFor(id, track, index, avoid = []) {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SC_KEY) || '{}'); } catch { /* storage unavailable */ }
+  if (avoid.length) id += ':' + avoid.map(([a, b]) => `${Math.round(a)}-${Math.round(b)}`).join(',');
   if (saved[id]) return shortcutsFromSpecs(track, saved[id]);
-  const list = findShortcuts(track, index);
+  const list = findShortcuts(track, index, 3, SHORTCUT, avoid);
   saved[id] = list.map(({ a, b, side }) => ({ a, b, side }));
   try { localStorage.setItem(SC_KEY, JSON.stringify(saved)); } catch { /* storage unavailable */ }
   return list;
@@ -25,8 +28,10 @@ import { addWorldDetail } from './detail.js';
 export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const scene = new THREE.Scene();
   const track = new TrackPath(def.layout.points, { width: def.layout.width });
+  // loop-the-loops (see loop.js), and the stretches of road in tunnels: [s from, s to]
+  const { loops, tunnels, avoid } = layoutFeatures(track, def.layout);
   const mainIndex = new TrackIndex(track);
-  const shortcuts = new ShortcutSet(track, shortcutsFor(def.id, track, mainIndex));
+  const shortcuts = new ShortcutSet(track, shortcutsFor(def.id, track, mainIndex, avoid));
   // scenery and terrain keep clear of (and flatten along) every road
   const index = new CompositeIndex([mainIndex, ...shortcuts.list.map((sc) => new TrackIndex(sc.path, 30))]);
   scene.fog = new THREE.FogExp2(def.fog.color, def.fog.density);
@@ -47,12 +52,12 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const hemi = new THREE.HemisphereLight(def.hemi.sky, def.hemi.ground, def.hemi.intensity);
   scene.add(hemi);
 
-  const trackGroup = buildTrackMeshes(track, def.trackStyle, glRenderer.capabilities.getMaxAnisotropy(), asphalt, shortcuts);
+  const trackGroup = buildTrackMeshes(track, def.trackStyle, glRenderer.capabilities.getMaxAnisotropy(), asphalt, shortcuts, loops);
   scene.add(trackGroup);
 
   const envScene = new THREE.Scene();
   envScene.add(createSky(def.sky, 400));
-  const scenery = def.build({ scene, track, index, density: quality.density, envScene, sunDir, shortcut: shortcuts }) || {};
+  const scenery = def.build({ scene, track, index, density: quality.density, envScene, sunDir, shortcut: shortcuts, loops, tunnels }) || {};
   // rock-like scenery (flat-shaded vertex-coloured instances: rocks, mesas, ruins) gets stone grain
   const detailed = new Set();
   scene.traverse((o) => {
@@ -75,7 +80,7 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
 
   const snap = 1;
   const world = {
-    def, scene, track, index, shortcuts, sky, sun, hemi, weather, landmark: scenery.landmark || null,
+    def, scene, track, index, shortcuts, loops, tunnels, sky, sun, hemi, weather, landmark: scenery.landmark || null,
     flash: 0,
     // split screen: a second weather box that only player 2's camera sees
     setViewCount(n) {

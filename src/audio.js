@@ -22,6 +22,7 @@ const SONGS = {
   canal: { bpm: 104, root: 57, chords: [[0, 4, 7, 11], [5, 9, 12, 16], [4, 7, 11, 14], [-3, 0, 4, 7]], bright: 0.85 }, // A: Imaj7 IVmaj7 iii7 vi7
   airport: { bpm: 112, root: 52, chords: [[0, 4, 7, 11], [2, 5, 9, 12], [5, 9, 12, 16], [7, 11, 14, 17]], bright: 0.9 }, // E: Imaj7 ii7 IVmaj7 V7
   space: { bpm: 122, root: 49, chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 2, 5, 9], [5, 8, 12, 15]], bright: 0.95 }, // C#m: i7 VImaj7 VII iv7
+  volcano: { bpm: 128, root: 50, chords: [[0, 3, 7, 10], [1, 5, 8, 12], [-2, 2, 5, 8], [-4, 0, 3, 7]], bright: 0.7 }, // D phrygian: i7 bIImaj7 bVII7 bVImaj7
 };
 
 export class AudioEngine {
