@@ -1,6 +1,6 @@
 # SLAMLINE
 
-Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and power-ups across nine tracks.
+Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and power-ups across ten tracks.
 
 **Play now:** https://rehmozayub.github.io/slamline/
 **Windows exe:** see [Releases](https://github.com/RehmozAyub/slamline/releases) (portable, no install)
@@ -8,10 +8,12 @@ Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and 
 
 ## Features
 
-- 9 tracks with their own weather: Sunset Coast, Neon City, Alpine Pass, Whiteout Summit (snowfall), Scorched Canyon (dust storm), Monsoon Jungle (thunderstorm), Canal Quarter (golden hour over the canals, humpback bridges), Nebula Ring (an orbital speedway above a ringed gas giant) and Skyport (an airport: the runway is the main straight, taxiway shortcuts, jets taking off overhead)
+- 10 tracks with their own weather: Sunset Coast, Neon City, Alpine Pass, Whiteout Summit (snowfall), Scorched Canyon (dust storm), Monsoon Jungle (thunderstorm), Canal Quarter (golden hour over the canals, humpback bridges), Nebula Ring (an orbital speedway above a ringed gas giant) Skyport (an airport: the runway is the main straight, taxiway shortcuts, jets taking off overhead) and Magma Core (inside a live volcano: a lava lake, lava falls down the crater walls, two lava-tube tunnels and a loop-the-loop)
 - 8 cars — Viper, Bolt, Raptor, Titan, Phantom, Rogue, the fighter-jet styled Jetstream and the starfighter-styled Pulsar — each with its own livery and balanced so every pick is competitive
 - 2 to 12 cars per race (Settings → CARS PER RACE; online the host picks it in the lobby)
-- 9 tracks, or **Random Track** to let the game pick
+- 10 tracks, or **Random Track** to let the game pick. Each card shows the track's shape; the scenery loads once you pick one
+- **Loop-the-loop** on Magma Core: the loop carries you round (nothing can wreck you on it) and pays out boost when you come out
+- **Paint picker**: one row of chips under the car, recoloured on the spot; hover a chip to preview it, and the paints you are still earning show how close you are
 - **2-3 secret shortcuts** on every track, marked by softly pulsing arrows at the fork (some AI rivals take them too): ramps with airtime boost (drift into a jump for a flat spin, keep holding for an aerial donut, or barrel roll off a half ramp), and hidden ones behind wooden fences you smash through
 - **Rivals:** whoever wrecks you is marked RIVAL; take them out for a PAYBACK boost
 - **Signature takedowns:** four named spots per track; the first one you find snaps a photo of the crash

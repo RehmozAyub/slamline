@@ -53,6 +53,14 @@ export function unlockedPaints(progress, paints) {
   });
 }
 
+// How far along a locked paint is: { have, need } (takedowns or stars), or null for open paints
+export function paintProgress(progress, p) {
+  if (!p.unlock) return null;
+  const need = p.unlock.takedowns || p.unlock.stars;
+  const have = p.unlock.takedowns ? progress.totalTakedowns : starCount(progress);
+  return { have: Math.min(have, need), need };
+}
+
 export function unlockText(p) {
   if (!p.unlock) return '';
   return p.unlock.takedowns ? `${p.unlock.takedowns} TAKEDOWNS` : `${p.unlock.stars} STARS`;

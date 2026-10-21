@@ -718,13 +718,19 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
 
   const paint = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, metalness: 0.6, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.3, side: THREE.DoubleSide,
-    map: liveryTexture(styleId, S, paintHex), normalMap: flakeNormalTexture(), normalScale: new THREE.Vector2(0.14, 0.14),
+    normalMap: flakeNormalTexture(), normalScale: new THREE.Vector2(0.14, 0.14),
   });
-  if (finish === 'chrome') { paint.metalness = 1; paint.roughness = 0.12; paint.clearcoat = 0.4; paint.envMapIntensity = 1.8; }
-  else if (finish === 'metal') { paint.metalness = 0.95; paint.roughness = 0.3; paint.envMapIntensity = 1.5; }
-  const pc = new THREE.Color(paintHex);
-  const lum = 0.2126 * pc.r + 0.7152 * pc.g + 0.0722 * pc.b;
-  const stripe = new THREE.MeshPhysicalMaterial({ color: lum > 0.45 ? 0x121316 : 0xf2f2f2, metalness: 0.2, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.05 });
+  const stripe = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, metalness: 0.2, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.05 });
+  // paint, finish and the stripe that contrasts with it (also used to repaint in the showroom)
+  const applyPaint = (hex, fin) => {
+    paint.map = liveryTexture(styleId, S, hex);
+    Object.assign(paint, { metalness: 0.6, roughness: 0.38, clearcoat: 1, envMapIntensity: 1.3 });
+    if (fin === 'chrome') Object.assign(paint, { metalness: 1, roughness: 0.12, clearcoat: 0.4, envMapIntensity: 1.8 });
+    else if (fin === 'metal') Object.assign(paint, { metalness: 0.95, roughness: 0.3, envMapIntensity: 1.5 });
+    const pc = new THREE.Color(hex);
+    stripe.color.setHex(0.2126 * pc.r + 0.7152 * pc.g + 0.0722 * pc.b > 0.45 ? 0x121316 : 0xf2f2f2);
+  };
+  applyPaint(paintHex, finish);
   const headMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xe8f2ff).multiplyScalar(5) });
   const tailMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff1028).multiplyScalar(2.5) });
   const amberMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb040).multiplyScalar(3) });
@@ -1002,9 +1008,10 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
   shadow.renderOrder = 1;
   root.add(shadow);
 
+  let ug = null;
   if (underglow) {
     const glowTex = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
-    const ug = new THREE.Mesh(new THREE.PlaneGeometry(3.4, L + 1.4), new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(underglow).multiplyScalar(1.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    ug = new THREE.Mesh(new THREE.PlaneGeometry(3.4, L + 1.4), new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(underglow).multiplyScalar(1.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     ug.rotation.x = -Math.PI / 2;
     ug.position.y = 0.06;
     root.add(ug);
@@ -1017,6 +1024,11 @@ export function buildCar(styleId, paintHex, { underglow = null, number = null, f
     length: L, wheelR: wr, halfBase, rideY: S.rideY,
     ownMaterials: [paint, stripe, headMat, tailMat, amberMat, glowMat, burnerMat, shadow.material, ...decals],
     setBrake(on) { tailMat.color.setHex(0xff1028).multiplyScalar(on ? 7 : 2.5); },
+    // a new paint without rebuilding the car (the paint picker); the underglow follows it
+    setPaint(hex, fin = null) {
+      applyPaint(hex, fin);
+      if (ug) ug.material.color.setHex(hex).multiplyScalar(1.6);
+    },
     setGhost(on) { root.visible = on ? (Math.floor(performance.now() / 90) % 2 === 0) : true; },
   };
 }

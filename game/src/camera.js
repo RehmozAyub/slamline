@@ -48,15 +48,20 @@ export class CameraRig {
 
   get inCrashCam() { return !!this.crash; }
 
-  // Slow orbit around a car (menus).
-  updateOrbit(dt, car, time) {
+  // Slow orbit around a car (menus). side (0-1): frame the car off to the right of the screen
+  // (eased), for the car screen's panel on the left.
+  updateOrbit(dt, car, time, side = 0) {
     this.orbit += dt * 0.22;
+    this.orbitSide = (this.orbitSide ?? side) + (side - (this.orbitSide ?? side)) * Math.min(1, dt * 3);
     const a = car.heading + 2.3 + Math.sin(this.orbit) * 1.1;
-    const r = 7.2 + Math.sin(this.orbit * 0.7) * 1.2;
+    const r = 7.2 + Math.sin(this.orbit * 0.7) * 1.2 + this.orbitSide * 0.6;
     this.cam.position.set(car.x + Math.sin(a) * r, car.y + 1.7 + Math.sin(this.orbit * 0.5) * 0.5, car.z + Math.cos(a) * r);
     this.up.set(0, 1, 0);
     this.cam.up.set(0, 1, 0);
-    this.cam.lookAt(car.x, car.y + 0.7, car.z);
+    // aim to the left of the car (screen right = (-fz, fx) for a camera looking along (fx, fz))
+    const fx = car.x - this.cam.position.x, fz = car.z - this.cam.position.z, fl = Math.hypot(fx, fz) || 1;
+    const k = this.orbitSide * r * 0.3;
+    this.cam.lookAt(car.x + (fz / fl) * k, car.y + 0.7, car.z - (fx / fl) * k);
     this.cam.fov = 45;
     this.cam.updateProjectionMatrix();
     this.snap = true;

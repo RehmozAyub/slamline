@@ -7,6 +7,25 @@ const icon = (id) => `<img class="picon" src="${powerIconURL(id)}" alt="">`;
 
 const $ = (sel, el = document) => el.querySelector(sel);
 
+// The shape of a track for its card (inline SVG, drawn once per map): the road, the start line
+// and any loop-the-loop. No scenery is built for it, so browsing the cards is instant.
+const shapes = new Map();
+function trackShape(m) {
+  if (shapes.has(m.id)) return shapes.get(m.id);
+  const pts = m.layout.points;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [x, , z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  const W = 100, H = 62, pad = 5;
+  const k = Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (z1 - z0));
+  const map = (x, z) => [(W / 2 + (x - (x0 + x1) / 2) * k).toFixed(1), (H / 2 + (z - (z0 + z1) / 2) * k).toFixed(1)];
+  const d = pts.map(([x, , z], i) => `${i ? 'L' : 'M'}${map(x, z).join(' ')}`).join('') + 'Z';
+  const [sx, sy] = map(pts[0][0], pts[0][2]);
+  const loops = (m.layout.loops || []).map((lp) => { const [lx, ly] = map((lp.from[0] + lp.to[0]) / 2, (lp.from[1] + lp.to[1]) / 2); return `<circle class="lp" cx="${lx}" cy="${ly}" r="3.4"/>`; }).join('');
+  const svg = `<svg class="tmap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="rd0" d="${d}"/><path class="rd" d="${d}"/>${loops}<rect class="st" x="${sx - 1.8}" y="${sy - 1.8}" width="3.6" height="3.6"/></svg>`;
+  shapes.set(m.id, svg);
+  return svg;
+}
+
 // touch screens: BACK / NEXT buttons in the corner of a menu screen (they send 'back' / 'confirm')
 const tnav = (go = '') => `<div class="tnav"><b data-a="back">◀ BACK</b>${go ? `<b data-a="confirm" class="go">${go} ▶</b>` : ''}</div>`;
 
@@ -42,8 +61,11 @@ export class UI {
           <div class="carcount" id="carcount"></div>
           <div class="cardesc" id="cardesc"></div>
           <div class="stats" id="stats"></div>
-          <div class="paintlabel">PAINT <span id="paintname"></span></div>
+        </div>
+        <div class="paintshop">
+          <div class="pshead"><span class="plabel">PAINT</span><b id="paintname"></b><em id="paintfinish"></em></div>
           <div class="swatches" id="swatches"></div>
+          <div class="plock" id="paintlock"></div>
         </div>
         <div class="hints">← → CAR &nbsp;·&nbsp; ↑ ↓ PAINT &nbsp;·&nbsp; ENTER RACE &nbsp;·&nbsp; ESC BACK</div>
         ${tnav('RACE')}
@@ -82,6 +104,7 @@ export class UI {
             <p>On by default: you steer, it helps. It nudges you away from the walls, calms over-steering, brakes for bends you'd miss and makes wall hits less punishing. <span class="k-in">Press <b>H</b> in a race (or use the pause menu)</span><span class="t-in">Turn it off in the pause menu</span> to drive fully manual.</p>
             <h2>RIVALS &amp; SECRETS</h2>
             <p>Whoever wrecks you becomes your <b>RIVAL</b>: take them out for a big <b>PAYBACK</b> boost. Every track hides <b>shortcuts</b> (some behind fences, some with <b>ramps</b>: drift into the jump for a <b>flat spin</b>, keep holding drift for an <b>aerial donut</b>, or <b>barrel roll</b> off a half ramp) and four <b>signature takedown</b> spots. Earn <b>three stars</b> per track (win, 5 takedowns, no crashes) and unlock new paints with takedowns and stars.</p>
+            <p><b>MAGMA CORE</b> has a <b>loop-the-loop</b>: keep your foot down, the loop carries you round (nothing can wreck you on it) and pays out boost at the bottom.</p>
             <h2>POWER-UPS</h2>
             <p class="note">Every block shows what's inside. Drive through one to grab it (a new one replaces the one you hold). Rivals use them too.</p>
             ${POWER_IDS.map((id) => `<p class="pw">${icon(id)}<b style="color:${POWERS[id].color}">${POWERS[id].name}</b> ${POWERS[id].desc.toLowerCase()}</p>`).join('')}
@@ -240,16 +263,16 @@ export class UI {
       </div>`;
     el.innerHTML = maps.map((m, i) => `
       <div class="card c-${m.id}${i === index ? ' sel' : ''}" data-i="${i}">
-        <div class="art"></div>
-        <div class="info"><div class="num">0${i + 1}</div><div class="name">${m.name}</div><div class="tag">${m.tagline}</div>
+        <div class="art"></div>${trackShape(m)}
+        <div class="info"><div class="num">${String(i + 1).padStart(2, '0')}</div><div class="name">${m.name}</div><div class="tag">${m.tagline}</div>
           <div class="meta"><span class="wx">${m.weatherLabel || ''}</span><span>${(lengths[i] / 1000).toFixed(2)} KM</span><span>${cars} CARS</span></div>
           ${prog[i] ? `<div class="prog"><span class="stars">${prog[i].stars.map((s) => `<i class="${s ? 'on' : ''}">★</i>`).join('')}</span><span class="sigs">SIGNATURES ${prog[i].sigs}/${prog[i].sigTotal}</span></div>` : ''}</div>
       </div>`).join('') + random;
     return el;
   }
 
-  // unlocked[i]: paint i is available; lockText(p): what unlocks it
-  carPanel(car, paints, paintIndex, index = 0, total = 1, who = '', unlocked = null, lockText = () => '') {
+  // unlocked[i]: paint i is available; lockText(p): what unlocks it; progressOf(p): { have, need }
+  carPanel(car, paints, paintIndex, index = 0, total = 1, who = '', unlocked = null, lockText = () => '', progressOf = () => null) {
     $('#s-cars .head').innerHTML = who ? `<b>${who}</b> SELECT CAR` : '<b>SELECT</b> CAR';
     $('#carcount').textContent = `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
     const nameEl = $('#carname');
@@ -263,9 +286,34 @@ export class UI {
     $('#cardesc').textContent = car.desc;
     $('#stats').innerHTML = [['SPEED', car.stats.speed], ['ACCEL', car.stats.accel], ['HANDLING', car.stats.handling], ['STRENGTH', car.stats.strength]]
       .map(([k, v]) => `<div class="stat"><span>${k}</span><div class="sbar"><i style="width:${Math.round(v * 100)}%"></i></div></div>`).join('');
+    this.paintPanel(paints, paintIndex, unlocked, lockText, progressOf);
+  }
+
+  // The paint row: open paints, then the ones still to earn (each with its progress bar)
+  paintPanel(paints, paintIndex, unlocked = null, lockText = () => '', progressOf = () => null) {
     const open = (i) => !unlocked || unlocked[i];
-    $('#swatches').innerHTML = paints.map((p, i) => `<i class="${i === paintIndex ? 'sel' : ''}${open(i) ? '' : ' locked'}${p.finish ? ' ' + p.finish : ''}" data-i="${i}" title="${open(i) ? p.name : 'Unlock: ' + lockText(p)}" style="background:#${p.hex.toString(16).padStart(6, '0')}"></i>`).join('');
-    $('#paintname').textContent = paints[paintIndex].name.toUpperCase();
+    const css = (p) => `#${p.hex.toString(16).padStart(6, '0')}`;
+    const chip = (p, i) => {
+      const pr = open(i) ? null : progressOf(p);
+      const bar = pr ? `<u><span style="width:${Math.round((pr.have / pr.need) * 100)}%"></span></u>` : '';
+      return `<i class="${i === paintIndex ? 'sel' : ''}${open(i) ? '' : ' locked'}${p.finish ? ' ' + p.finish : ''}" data-i="${i}" style="--c:${css(p)}">${bar}</i>`;
+    };
+    const idx = paints.map((p, i) => i);
+    const earn = idx.filter((i) => !open(i));
+    $('#swatches').innerHTML = idx.filter(open).map((i) => chip(paints[i], i)).join('')
+      + (earn.length ? `<em class="earn">EARN</em>${earn.map((i) => chip(paints[i], i)).join('')}` : '');
+    this.paintInfo(paints, paintIndex, open(paintIndex), lockText, progressOf);
+  }
+
+  // name and finish of paint i (hovered or picked); for a locked one what unlocks it
+  paintInfo(paints, i, isOpen = true, lockText = () => '', progressOf = () => null) {
+    const p = paints[i];
+    const name = $('#paintname');
+    name.textContent = p.name.toUpperCase();
+    name.style.setProperty('--c', `#${p.hex.toString(16).padStart(6, '0')}`);
+    $('#paintfinish').textContent = { chrome: 'CHROME', metal: 'BRUSHED METAL' }[p.finish] || 'METALLIC';
+    const pr = isOpen ? null : progressOf(p);
+    $('#paintlock').textContent = isOpen ? '' : `LOCKED · EARN ${lockText(p)}${pr ? ` · ${pr.have} / ${pr.need}` : ''}`;
   }
 
   hud(d, i = 0) {

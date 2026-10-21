@@ -270,7 +270,6 @@ export class OnlineFlow {
     g.audio.blip(600, 0.03, 0.06);
     this.renderLobby();
     this.broadcastRoster();
-    if (g.sel.track < MAPS.length) g.previewTrack();
   }
 
   cycleCars(d) {
