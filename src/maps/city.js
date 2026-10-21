@@ -6,7 +6,7 @@ import { addWorldDetail } from '../detail.js';
 import { windowTextures, neonSignTexture, radialTexture } from '../textures.js';
 
 const NEON = [0xff2d95, 0x19e3ff, 0xffd23f, 0x8a3cff, 0x3dff8a, 0xff6a2d];
-const SIGNS = ['NEON', 'HOTEL', 'RAMEN', 'CLUB 88', 'ARCADE', 'TURBO', 'NITRO', 'KARAOKE', 'APEX', 'DINER', 'OPEN 24H', 'SUSHI'];
+const SIGNS = ['NEON', 'HOTEL', 'RAMEN', 'CLUB 88', 'ARCADE', 'TURBO', 'NITRO', 'KARAOKE', 'GARAGE', 'DINER', 'OPEN 24H', 'SUSHI'];
 
 // Box with UVs scaled so a window tile covers 32 m x 64 m regardless of building size.
 function buildingGeo(w, h, d) {

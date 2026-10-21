@@ -55,4 +55,4 @@ export function makeCode(rand = Math.random) {
   for (let i = 0; i < 4; i++) s += CODE_CHARS[Math.floor(rand() * CODE_CHARS.length)];
   return s;
 }
-export const peerId = (code) => `apexrush-${code.toUpperCase()}`;
+export const peerId = (code) => `slamline-${code.toUpperCase()}`;

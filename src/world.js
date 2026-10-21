@@ -7,7 +7,7 @@ import { LAYOUT_SCALE } from './maps/layouts.js';
 
 // The shortcut search takes about a second per track, so its result ({a, b, side} per shortcut)
 // is kept in localStorage; it only changes if the search rules or layouts change.
-const SC_KEY = 'apexrush.shortcuts.' + JSON.stringify([SHORTCUT, LAYOUT_SCALE]).split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7);
+const SC_KEY = 'slamline.shortcuts.' + JSON.stringify([SHORTCUT, LAYOUT_SCALE]).split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7);
 function shortcutsFor(id, track, index) {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SC_KEY) || '{}'); } catch { /* storage unavailable */ }

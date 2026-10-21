@@ -104,7 +104,9 @@ export class Vehicle {
     const acc = sp.accel * mul * (this.boosting ? BOOST_ACCEL : 1);
     this.braking = false;
     if (c.throttle > 0) {
-      if (vF < top) {
+      // rolling back: gas brakes as hard as the brake pedal does going forward
+      if (vF < -0.5) vF = Math.min(0, vF + 34 * c.throttle * dt);
+      else if (vF < top) {
         const k = Math.max(0.08, 1 - Math.pow(Math.max(vF, 0) / top, 2));
         vF += acc * c.throttle * k * dt;
       } else vF -= (vF - top) * 1.2 * dt;
@@ -125,7 +127,7 @@ export class Vehicle {
     // arcade: keep most of the speed through corners instead of scrubbing it
     const keep = this.drifting ? 0.72 : 0.9;
     const newMag = Math.hypot(vF, vR);
-    if (newMag > 0.1 && oldMag > newMag && c.throttle > 0) {
+    if (newMag > 0.1 && oldMag > newMag && c.throttle > 0 && vF > 0) {
       const target = newMag + (oldMag - newMag) * keep;
       const f2 = Math.max(0, target * target - vR * vR);
       vF = Math.sign(vF || 1) * Math.sqrt(f2);
