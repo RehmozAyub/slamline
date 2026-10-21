@@ -362,6 +362,7 @@ test('every car spends the points budget (within 10%), most exactly', () => {
 });
 
 import { findShortcuts, constrainOnRoads, ShortcutSet, SHORTCUT } from '../game/src/shortcut.js';
+import { layoutFeatures } from '../game/src/loop.js';
 import { AIDriver } from '../game/src/ai.js';
 import { signatureAt, hairpinS, SIGNATURES, SIGNATURE_KINDS } from '../game/src/signatures.js';
 import { recordRace, discoverSignature, unlockedPaints, emptyProgress, starsEarned } from '../game/src/progress.js';
@@ -372,7 +373,8 @@ const shortcutsOf = (id) => {
   if (!shortcutCache.has(id)) {
     const lay = LAYOUTS[id];
     const t = new TrackPath(lay.points, { width: lay.width });
-    shortcutCache.set(id, { t, list: findShortcuts(t) });
+    // as the game builds them: clear of any loop or tunnel (world.js)
+    shortcutCache.set(id, { t, list: findShortcuts(t, undefined, 3, SHORTCUT, layoutFeatures(t, lay).avoid) });
   }
   return shortcutCache.get(id);
 };

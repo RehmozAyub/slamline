@@ -153,9 +153,10 @@ function bezierPoints(track, a, b, side, width) {
   return { pts, chord };
 }
 
-// Search the track for the best corner to cut, away from the shortcuts already `taken`.
+// Search the track for the best corner to cut, away from the shortcuts already `taken` and off
+// the `avoid` stretches of main road ([s from, s to]: a loop, tunnels).
 // Returns null when nothing suitable exists.
-export function findShortcut(track, index = new TrackIndex(track), R = SHORTCUT, stats = {}, taken = []) {
+export function findShortcut(track, index = new TrackIndex(track), R = SHORTCUT, stats = {}, taken = [], avoid = []) {
   const L = track.length, hw = track.halfWidth;
   let best = null;
   const clashes = (a, b, path) => taken.some((t) => {
@@ -169,6 +170,7 @@ export function findShortcut(track, index = new TrackIndex(track), R = SHORTCUT,
   for (let a = R.minStartS; a < L - R.endMargin - R.minSpan; a += R.searchStep) {
     for (let span = R.minSpan; span <= R.maxSpan && a + span < L - R.endMargin; span += R.searchStep) {
       const b = a + span;
+      if (avoid.some(([x, y]) => a < y && b > x)) continue;
       // cut the inside of the bend
       let turn = 0;
       for (let s = a; s < b; s += track.step * 2) turn += track.curv[Math.floor(s / track.step) % track.n];
@@ -205,10 +207,10 @@ export function findShortcut(track, index = new TrackIndex(track), R = SHORTCUT,
 // Up to `count` shortcuts per track, each with its own character:
 //   1st: open, with a full-width ramp       2nd: hidden behind a fence, with a half ramp
 //   3rd: hidden behind a fence, with a boost ring
-export function findShortcuts(track, index = new TrackIndex(track), count = 3, R = SHORTCUT) {
+export function findShortcuts(track, index = new TrackIndex(track), count = 3, R = SHORTCUT, avoid = []) {
   const list = [];
   for (let k = 0; k < count; k++) {
-    const sc = findShortcut(track, index, k === 0 ? R : { ...R, minSaving: R.minSavingExtra, minRadius: R.minRadius * 0.85, clearance: R.clearance * 0.7, forkLength: 95 }, {}, list);
+    const sc = findShortcut(track, index, k === 0 ? R : { ...R, minSaving: R.minSavingExtra, minRadius: R.minRadius * 0.85, clearance: R.clearance * 0.7, forkLength: 95 }, {}, list, avoid);
     if (!sc) break;
     list.push(sc);
   }

@@ -54,6 +54,12 @@ export const SIGNATURES = {
     hairpin: { name: 'HOLDING PATTERN', line: 'Circled once. Never came back.' },
     line: { name: 'FINAL APPROACH', line: 'Missed the runway by a mile.' },
   },
+  volcano: {
+    landmark: { name: 'LOOPED OUT', line: 'Went round once. Came out in pieces.' },
+    shortcut: { name: 'MAGMA DASH', line: 'Took the hot route. Got burned.' },
+    hairpin: { name: 'MELTDOWN', line: 'Too hot to handle that bend.' },
+    line: { name: 'ERUPTION', line: 'Blew up right at the finish.' },
+  },
   space: {
     landmark: { name: 'GATE CRASHER', line: 'Wrong way through the stargate.' },
     shortcut: { name: 'WORMHOLE', line: 'In through the wormhole, out of the race.' },

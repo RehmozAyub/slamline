@@ -6,7 +6,7 @@ export const STATE_FIELDS = ['idx', 'x', 'y', 'z', 'heading', 'vx', 'vz', 'yawRa
   'trickYaw', 'trickRoll', 'steer', 'slip', 's', 'lateral', 'scU', 'scIdx', 'flags'];
 const N = STATE_FIELDS.length;
 
-export const FLAG = { wrecked: 1, ghost: 2, boosting: 4, braking: 8, drifting: 16, air: 32, onSC: 64, scraping: 128 };
+export const FLAG = { wrecked: 1, ghost: 2, boosting: 4, braking: 8, drifting: 16, air: 32, onSC: 64, scraping: 128, loop: 256 };
 
 // the state of one car (Vehicle `v`, car index `idx` in the session, `boosting` from its owner)
 export function carState(idx, v, scIdx, boosting, out = {}) {
@@ -16,9 +16,11 @@ export function carState(idx, v, scIdx, boosting, out = {}) {
   out.pitch = v.pitch; out.roll = v.roll; out.bodyPitch = v.bodyPitch; out.bodyRoll = v.bodyRoll;
   out.trickYaw = v.trickYaw || 0; out.trickRoll = v.trickRoll || 0;
   out.steer = v.steer; out.slip = v.slip;
-  out.s = v.s; out.lateral = v.lateral; out.scU = v.onSC ? v.scU ?? 0 : 0; out.scIdx = v.onSC ? scIdx : -1;
+  // on a shortcut: scU / scIdx = distance along it / which one; on a loop: along the rail / which loop
+  out.s = v.s; out.lateral = v.lateral; out.scU = v.onSC ? v.scU ?? 0 : v.loop ? v.loop.u : 0; out.scIdx = v.onSC || v.loop ? scIdx : -1;
   out.flags = (v.wrecked ? FLAG.wrecked : 0) | (v.ghost > 0 ? FLAG.ghost : 0) | (boosting ? FLAG.boosting : 0) | (v.braking ? FLAG.braking : 0)
-    | (v.drifting ? FLAG.drifting : 0) | (v.air ? FLAG.air : 0) | (v.onSC ? FLAG.onSC : 0) | (v.scraping > 0.5 ? FLAG.scraping : 0);
+    | (v.drifting ? FLAG.drifting : 0) | (v.air ? FLAG.air : 0) | (v.onSC ? FLAG.onSC : 0) | (v.scraping > 0.5 ? FLAG.scraping : 0)
+    | (v.loop ? FLAG.loop : 0);
   return out;
 }
 

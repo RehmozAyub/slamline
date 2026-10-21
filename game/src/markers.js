@@ -50,7 +50,9 @@ export class RivalMarkers {
       s.visible = !!c && !c.vehicle.wrecked;
       if (!s.visible) return;
       const v = c.vehicle;
-      s.position.set(v.x, v.y + 3.4 + Math.sin(time * 5) * 0.2, v.z);
+      const P = v.loopPose, up = 3.4 + Math.sin(time * 5) * 0.2;
+      if (P) s.position.set(P.x + P.ux * up, P.y + P.uy * up, P.z + P.uz * up); // going round a loop
+      else s.position.set(v.x, v.y + up, v.z);
     });
   }
 

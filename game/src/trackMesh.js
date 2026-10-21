@@ -52,12 +52,16 @@ function fixWinding(g, wantUp) {
 }
 
 // asphalt: { map, normalMap, roughnessMap } from getAsphalt()
-// shortcuts: ShortcutSet (or null)
-export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = null) {
+// shortcuts: ShortcutSet (or null); loops: LoopRail list (the road under a loop isn't drawn)
+export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = null, loops = []) {
   const group = new THREE.Group();
   const hw = track.halfWidth;
-  // per side: which main-road samples keep their roadside (no gap for the shortcut)
-  const sideKeep = (side) => (shortcuts ? shortcuts.mainKeep(side) : null);
+  const open = loops.length ? (i) => !loops.some((r) => r.inLoop(i * track.step)) : null;
+  // per side: which main-road samples keep their roadside (no gap for the shortcut, no loop)
+  const sideKeep = (side) => {
+    const sc = shortcuts ? shortcuts.mainKeep(side) : null;
+    return sc && open ? (i) => sc(i) && open(i) : sc || open;
+  };
 
   // Road: procedural asphalt (albedo + normal + roughness) plus world-space grit and tone variation
   const at = asphalt;
@@ -72,9 +76,10 @@ export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = nu
     envMapIntensity: style.road.envIntensity ?? 1,
   });
   addWorldDetail(roadMat, { fine: [1.4, 0.14], macro: [0.011, 0.26], rough: 0.12, minRough: style.road.minRough ?? 0.02, sunSpec: style.road.sunSpec ?? 0.3 });
-  const road = new THREE.Mesh(fixWinding(ribbon(track, [-hw, 0], [hw, 0], { vScale: 1 / 40 }), true), roadMat);
+  const road = new THREE.Mesh(fixWinding(ribbon(track, [-hw, 0], [hw, 0], { vScale: 1 / 40, keep: open }), true), roadMat);
   road.receiveShadow = true;
   group.add(road);
+  for (const r of loops) group.add(buildLoop(r, style, roadMat));
 
   // Shoulders just outside the road, under the barrier
   // gravel shoulders
@@ -490,4 +495,172 @@ function edgeReflectors(group, sc, color = 0xffa820) {
   const m = new THREE.Matrix4();
   studs.forEach((p, i) => { m.makeRotationY(p.heading); m.setPosition(p.x, p.y + 0.03, p.z); mesh.setMatrixAt(i, m); });
   group.add(mesh);
+}
+
+// --- loop-the-loop ------------------------------------------------------------------
+// A ribbon along a loop rail between two (lateral, height) profiles, height along the rail's up.
+// Faces the side (B - A) x forward, so list the profiles accordingly.
+function railRibbon(rail, us, a, b, vOf = (u) => u / 40, [uFrom, uTo] = [0, 1]) {
+  const pos = [], uv = [], idx = [];
+  const P = {};
+  us.forEach((u, i) => {
+    rail.pose(u, 0, P);
+    for (const [lat, h] of [a, b]) pos.push(P.x + P.bx * lat + P.ux * h, P.y + P.by * lat + P.uy * h, P.z + P.bz * lat + P.uz * h);
+    uv.push(uFrom, vOf(u), uTo, vOf(u));
+    if (i < us.length - 1) { const p = i * 2; idx.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// matrix placing an object on the rail at (u, lat, h): x = left, y = up, z = forward (like a car)
+function railMatrix(rail, u, lat, h, m = new THREE.Matrix4(), P = {}) {
+  rail.pose(u, lat, P);
+  m.makeBasis(new THREE.Vector3(-P.bx, -P.by, -P.bz), new THREE.Vector3(P.ux, P.uy, P.uz), new THREE.Vector3(P.tx, P.ty, P.tz));
+  m.setPosition(P.x + P.ux * h, P.y + P.uy * h, P.z + P.uz * h);
+  return m;
+}
+
+// The loop: road, walls with a glowing rim, a slab underneath, edge lights, columns under the
+// low parts and a gantry holding the top. It joins the main road exactly where that stops.
+function buildLoop(rail, style, roadMat) {
+  const group = new THREE.Group();
+  const track = rail.track, hw = track.halfWidth, step = track.step, lead = rail.R.lead;
+  const u0 = rail.uOf(Math.floor(rail.s0 / step) * step), u1 = rail.uOf(Math.ceil(rail.s1 / step) * step);
+  const us = [];
+  for (let u = u0; u < u1; u += 1) us.push(u);
+  us.push(u1);
+  // asphalt texture runs on without a seam into the main road at both ends
+  const extra = 40 * Math.round((rail.loopArc - rail.span) / 40), k = (rail.span + extra) / rail.loopArc;
+  const vOf = (u) => (u <= lead ? rail.sA + u : u >= rail.length - lead ? rail.s1 + extra + u - (rail.length - lead) : rail.s0 + (u - lead) * k) / 40;
+
+  const mat = new THREE.MeshStandardMaterial({
+    map: roadMat.map, normalMap: roadMat.normalMap, normalScale: roadMat.normalScale, roughnessMap: roadMat.roughnessMap,
+    roughness: 1, metalness: roadMat.metalness, envMapIntensity: roadMat.envMapIntensity,
+  });
+  addWorldDetail(mat, { fine: [1.4, 0.14], macro: [0.011, 0.26], rough: 0.12, triplanar: true, minRough: style.road.minRough ?? 0.02, sunSpec: style.road.sunSpec ?? 0.3 });
+  const road = new THREE.Mesh(railRibbon(rail, us, [-hw, 0], [hw, 0], vOf), mat);
+  road.receiveShadow = true;
+  group.add(road);
+
+  const bs = style.barrier || {};
+  const wallMat = addWorldDetail(new THREE.MeshStandardMaterial({ color: bs.color ?? 0x2a2a2e, roughness: 0.7, metalness: 0.2, side: THREE.DoubleSide }), { fine: [1.2, 0.35], macro: [0.04, 0.25], rough: 0.2, triplanar: true });
+  const slabMat = new THREE.MeshStandardMaterial({ color: style.loop?.under ?? 0x1c1d22, roughness: 0.55, metalness: 0.6, side: THREE.DoubleSide });
+  const w0 = hw, w1 = hw + 0.5, w2 = hw + 1.1, top = 1.1, under = -1.2;
+  const add = (g, m, cast = true) => { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; group.add(o); return o; };
+  for (const sd of [-1, 1]) {
+    const f = (a, b) => (sd > 0 ? [a, b] : [b, a]); // keep every face pointing the same way round
+    add(railRibbon(rail, us, ...f([sd * w0, 0], [sd * w1, 0])), slabMat, false); // rim up to the wall
+    add(railRibbon(rail, us, ...f([sd * w1, top], [sd * w1, 0])), wallMat); // inner face
+    add(railRibbon(rail, us, ...f([sd * w2, top], [sd * w1, top])), wallMat); // top
+    add(railRibbon(rail, us, ...f([sd * w2, under], [sd * w2, top])), wallMat); // outer face
+  }
+  add(railRibbon(rail, us, [w2, under], [-w2, under]), slabMat); // underside
+
+  // glowing rim on both wall tops and a band down each outer face: from afar the loop is a ring
+  // of light
+  const glow = new THREE.Color(style.loop?.glow ?? (bs.glow ? bs.glow[0] : 0xff6a1a)).multiplyScalar(style.loop?.glowIntensity ?? 4);
+  const glowMat = new THREE.MeshBasicMaterial({ color: glow, side: THREE.DoubleSide });
+  for (const sd of [-1, 1]) {
+    const f = (a, b) => (sd > 0 ? [a, b] : [b, a]);
+    add(railRibbon(rail, us, ...f([sd * (w2 - 0.1), top + 0.02], [sd * (w1 + 0.1), top + 0.02])), glowMat, false);
+    add(railRibbon(rail, us, ...f([sd * (w2 + 0.02), under * 0.25 - 0.15], [sd * (w2 + 0.02), under * 0.25 + 0.15])), glowMat, false);
+  }
+
+  // edge lights every few metres (a sense of speed going round)
+  const studs = [];
+  for (let u = Math.max(u0, lead); u < Math.min(u1, rail.length - lead); u += 5) for (const sd of [-1, 1]) studs.push([u, sd * (hw - 0.35)]);
+  const lights = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.08, 1.2), new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(0.6) }), studs.length);
+  const m = new THREE.Matrix4();
+  studs.forEach(([u, lat], i) => lights.setMatrixAt(i, railMatrix(rail, u, lat, 0.03, m)));
+  group.add(lights);
+
+  // steel: columns from the ground up to the low parts, two towers and a beam over the top
+  const steel = new THREE.MeshStandardMaterial({ color: style.loop?.steel ?? 0x3a3a40, roughness: 0.5, metalness: 0.7 });
+  const cols = [];
+  const P = {};
+  const ground = track.pointAt(rail.s0, 0).y;
+  for (let u = lead + 6; u < rail.length - lead - 6; u += 9) {
+    rail.pose(u, 0, P);
+    if (P.uy < 0.35) continue; // only where the slab faces the ground
+    const bx = P.x - P.ux * 1.2, by = P.y - P.uy * 1.2, bz = P.z - P.uz * 1.2;
+    if (by - ground < 1.5) continue;
+    for (const sd of [-1, 1]) {
+      const x = bx + P.bx * sd * (hw - 2), z = bz + P.bz * sd * (hw - 2);
+      cols.push({ x, z, y0: ground - 1, y1: by + P.by * sd * (hw - 2) });
+    }
+  }
+  if (cols.length) {
+    const colMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), steel, cols.length);
+    cols.forEach((c, i) => { m.makeScale(0.9, c.y1 - c.y0, 0.9); m.setPosition(c.x, c.y0, c.z); colMesh.setMatrixAt(i, m); });
+    colMesh.castShadow = true;
+    group.add(colMesh);
+  }
+  const uTop = lead + rail.loopArc / 2;
+  rail.pose(uTop, 0, P);
+  const T0 = track.pointAt(rail.s0, 0);
+  const topY = P.y + 1.2; // the slab's upper side at the top
+  const left = rail.pose(uTop, -(w2 + 7)), right = rail.pose(uTop, w2 + 7);
+  const beamY = topY + 4;
+  for (const q of [left, right]) {
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(2.4, beamY - ground + 1.2, 2.4), steel);
+    tower.position.set(q.x, (ground + beamY) / 2, q.z);
+    tower.rotation.y = T0.heading;
+    tower.castShadow = true;
+    group.add(tower);
+    // hazard band and a warning light up top
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.6, 2.6), glowMat);
+    lamp.position.set(q.x, beamY + 0.8, q.z);
+    lamp.rotation.y = T0.heading;
+    group.add(lamp);
+  }
+  const span = Math.hypot(right.x - left.x, right.z - left.z);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(span + 2.4, 1.6, 2.2), steel);
+  beam.position.set((left.x + right.x) / 2, beamY, (left.z + right.z) / 2);
+  beam.rotation.y = Math.atan2(right.x - left.x, right.z - left.z) - Math.PI / 2;
+  beam.castShadow = true;
+  group.add(beam);
+  for (const sd of [-0.6, 0.6]) {
+    const q = rail.pose(uTop, sd * hw);
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.7, beamY - (q.y + 1.2), 0.7), steel);
+    strut.position.set(q.x, (beamY + q.y + 1.2) / 2, q.z);
+    group.add(strut);
+  }
+
+  // into the loop: chevrons on the road and a gantry sign
+  const cMat = new THREE.MeshBasicMaterial({ map: chevronTexture(), color: new THREE.Color(0xffd400).multiplyScalar(1.1), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  const cGeo = new THREE.PlaneGeometry(6, 6).rotateX(-Math.PI / 2);
+  for (const back of [58, 44, 30, 16]) {
+    for (const lat of [-hw * 0.5, hw * 0.5]) {
+      const p = track.pointAt(rail.sA - back + lead, lat);
+      const c = new THREE.Mesh(cGeo, cMat);
+      c.position.set(p.x, p.y + 0.04, p.z);
+      c.rotation.y = p.heading + Math.PI;
+      c.renderOrder = 2;
+      group.add(c);
+    }
+  }
+  const g = new THREE.Group();
+  const gp = track.pointAt(rail.sA - 40, 0);
+  for (const sd of [-1, 1]) {
+    const pil = new THREE.Mesh(new THREE.BoxGeometry(0.9, 9, 0.9), steel);
+    pil.position.set(sd * (hw + 1.6), 4.5, 0);
+    pil.castShadow = true;
+    g.add(pil);
+  }
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(track.width * 0.8, 2.2), new THREE.MeshBasicMaterial({ map: textTexture('▲  LOOP  ▲', { accent: style.accent ?? '#ff2d55', bg: '#ffd400', fg: '#111111' }), toneMapped: false, side: THREE.DoubleSide }));
+  board.position.set(0, 8.2, 0);
+  board.rotation.y = Math.PI;
+  g.add(board);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(track.width + 4, 0.5, 0.6), steel);
+  bar.position.y = 9.5;
+  g.add(bar);
+  g.position.set(gp.x, gp.y, gp.z);
+  g.rotation.y = gp.heading;
+  group.add(g);
+  return group;
 }

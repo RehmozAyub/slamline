@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { NetClock } from './clock.js';
 import { packStates, unpackStates, carState, FLAG } from './protocol.js';
-import { RemoteCar, History } from './remoteCar.js';
+import { RemoteCar, History, SMOOTH } from './remoteCar.js';
 import { HitJudge, plausibleContact } from './hits.js';
 import { AIDriver } from '../ai.js';
 
@@ -170,11 +170,12 @@ export class Online {
     const S = this.session, now = this.now;
     for (const [idx, rc] of this.remote) {
       const st = rc.sample(now, dt);
-      if (st) this.applyRemote(S.cars[idx], st, dt);
+      if (st) this.applyRemote(S.cars[idx], st, dt, Math.max(0, Math.min(SMOOTH.maxPredict, now - rc.lastT)));
     }
   }
 
-  applyRemote(c, st, dt) {
+  // ahead: seconds the state is predicted forward (a car on a loop is moved along the rail)
+  applyRemote(c, st, dt, ahead = 0) {
     const S = this.session, v = c.vehicle;
     const wrecked = !!(st.flags & FLAG.wrecked);
     if (wrecked && !v.wrecked) S.showRemoteWreck(c, Math.sin(st.heading), Math.cos(st.heading));
@@ -191,6 +192,14 @@ export class Online {
     const onSC = !!(st.flags & FLAG.onSC) && S.shortcuts && S.shortcuts.list[st.scIdx];
     v.onSC = !!onSC; v.sc = onSC || null; v.scU = st.scU; v.scLat = onSC ? st.lateral : undefined;
     v.air = !!(st.flags & FLAG.air);
+    // going round a loop: scU is the distance along the rail, scIdx which loop
+    const rail = st.flags & FLAG.loop ? S.loops[st.scIdx] : null;
+    if (rail) {
+      const vF = st.vx * Math.sin(st.heading) + st.vz * Math.cos(st.heading);
+      const u = Math.max(0, Math.min(rail.length, st.scU + vF * ahead));
+      v.loop = { rail, u, lat: st.lateral, vF, t: 0 };
+      v.loopPose = rail.pose(u, st.lateral, v.loopPose || {});
+    } else { v.loop = null; v.loopPose = null; }
     v.ghost = st.flags & FLAG.ghost ? 0.3 : 0;
     v.boosting = !!(st.flags & FLAG.boosting);
     v.braking = !!(st.flags & FLAG.braking);
@@ -216,7 +225,8 @@ export class Online {
       const scs = S.shortcuts ? S.shortcuts.list : [];
       for (const c of S.cars) {
         if (c.remote) continue;
-        list.push(carState(c.index, c.vehicle, c.vehicle.onSC ? scs.indexOf(c.vehicle.sc) : -1, c.vehicle.boosting));
+        const v = c.vehicle;
+        list.push(carState(c.index, v, v.onSC ? scs.indexOf(v.sc) : v.loop ? S.loops.indexOf(v.loop.rail) : -1, v.boosting));
       }
       const buf = packStates(now, list);
       for (const e of this.links.values()) e.link.sendState(buf);
