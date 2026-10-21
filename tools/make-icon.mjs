@@ -1,4 +1,4 @@
-// Draws the APEX RUSH icon (dark rounded tile with a slanted "A" chevron and speed stripes) and writes
+// Draws the SLAMLINE icon (dark rounded tile with a slanted blocky "S" and speed stripes) and writes
 // every size the builds use: electron/icon.png, the web-app icons in game/icons and the Android
 // launcher icons (legacy tiles plus adaptive background/foreground layers).
 import { deflateSync } from 'node:zlib';
@@ -18,10 +18,12 @@ function inPoly(x, y, poly) {
   return c;
 }
 
-// artwork in a 256 x 256 design space: slanted chevron "A", crossbar and two speed stripes
+// artwork in a 256 x 256 design space: a slanted blocky "S" with clipped corners, two speed stripes
 const sk = (x, y) => [x + (200 - y) * 0.28, y];
-const chevron = [[40, 210], [118, 40], [160, 40], [238, 210], [196, 210], [139, 84], [82, 210]].map(([x, y]) => sk(x, y));
-const bar = [[98, 150], [180, 150], [192, 176], [86, 176]].map(([x, y]) => sk(x, y));
+const letter = [
+  [210, 40], [210, 76], [98, 76], [88, 86], [88, 97], [98, 107], [180, 107], [210, 137], [210, 180], [180, 210],
+  [50, 210], [50, 174], [162, 174], [172, 164], [172, 153], [162, 143], [80, 143], [50, 113], [50, 70], [80, 40],
+].map(([x, y]) => sk(x, y));
 const stripes = [[[6, 120], [60, 120], [55, 130], [1, 130]], [[0, 146], [44, 146], [39, 156], [0, 156]]];
 
 const background = (x, y) => {
@@ -30,7 +32,7 @@ const background = (x, y) => {
 };
 const mark = (x, y) => {
   const t = Math.min(1, Math.max(0, (x + y) / (256 * 1.6)));
-  if (inPoly(x, y, chevron) || inPoly(x, y, bar)) return [mix(hot[0], orange[0], t), mix(hot[1], orange[1], t), mix(hot[2], orange[2], t), 255];
+  if (inPoly(x, y, letter)) return [mix(hot[0], orange[0], t), mix(hot[1], orange[1], t), mix(hot[2], orange[2], t), 255];
   if (stripes.some((s) => inPoly(x, y, s))) return [25, 227, 255, 255];
   return null;
 };

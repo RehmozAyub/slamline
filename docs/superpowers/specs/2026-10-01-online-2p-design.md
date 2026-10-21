@@ -1,4 +1,4 @@
-# APEX RUSH online: 2 players, room code (v2.0)
+# SLAMLINE online: 2 players, room code (v2.0)
 
 Two friends race each other over the internet, each on their own device. There are 8 cars in all: the 2 players plus 6 AI. Single player and local split screen stay exactly as they are.
 
@@ -9,7 +9,7 @@ Two friends race each other over the internet, each on their own device. There a
 | Players | 2 online players and 6 AI on the normal 8-car grid, with both players mid-pack (grid slots 4 and 5) |
 | Connection | WebRTC peer to peer through PeerJS (MIT licence, vendored under `game/vendor/peerjs`). The free PeerJS cloud broker is used only for the handshake; Google's public STUN servers handle NAT. |
 | Relay (TURN) | None for now. A failed connection shows "Can't connect on this network". |
-| Room code | 4 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. The host's peer id is `apexrush-<code>`. |
+| Room code | 4 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. The host's peer id is `slamline-<code>`. |
 | Car updates | 60 Hz in both directions over an unordered, unreliable channel. The host sends its own car plus 6 AI cars; the guest sends its own car. About 20–25 KB/s in total. |
 | Events | A separate reliable, ordered channel |
 | Smoothing | Remote cars are drawn predicted forward by the one-way latency, using velocity and yaw rate. Corrections blend in over 150 ms. A jump over 12 m (respawn) snaps. |

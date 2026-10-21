@@ -6,7 +6,7 @@
   "author": "SLAMLINE",
   "main": "main.cjs",
   "build": {
-    "appId": "com.apexrush.game",
+    "appId": "com.slamline.game",
     "productName": "Slamline",
     "files": ["main.cjs", "game/**/*"],
     "asar": true,

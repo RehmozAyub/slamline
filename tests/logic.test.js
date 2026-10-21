@@ -335,6 +335,22 @@ test('a car steering away from the rail gets free quickly and keeps its speed', 
   assert.ok(v.speed > 25, `speed ${v.speed.toFixed(1)}`);
 });
 
+test('gas while reversing stops the car fast and drives it forward', () => {
+  const t = new TrackPath(circle(400), { width: 20 });
+  for (const car of CARS) {
+    const v = new Vehicle(car);
+    v.placeOnTrack(t, 0, 0, 0);
+    const go = (c, secs) => { for (let i = 0; i < secs * 120; i++) { v.update(1 / 120, { steer: 0, throttle: 0, brake: 0, handbrake: false, boost: false, ...c }, 1); v.constrain(t); } };
+    go({ brake: 1 }, 3); // full reverse
+    assert.ok(v.vF < -15, `${car.name} reverse ${v.vF.toFixed(1)}`);
+    let time = 0;
+    while (v.vF < 0 && time < 5) { go({ throttle: 1 }, 1 / 120); time += 1 / 120; }
+    assert.ok(time < 0.8, `${car.name} took ${time.toFixed(2)} s to stop rolling back`);
+    go({ throttle: 1 }, 1);
+    assert.ok(v.vF > 12, `${car.name} forward ${v.vF.toFixed(1)} after 1 s`);
+  }
+});
+
 test('every car spends the points budget (within 10%), most exactly', () => {
   let exact = 0;
   for (const c of CARS) {

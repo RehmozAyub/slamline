@@ -1,11 +1,21 @@
-// Electron shell for SLAMLINE (formerly APEX RUSH): serves the game from a privileged app:// protocol
+// Electron shell for SLAMLINE: serves the game from a privileged app:// protocol
 // (ES modules don't load reliably from file://) and prefers the discrete GPU.
 const { app, BrowserWindow, protocol, net, Menu, session } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-// keep the settings / progress folder from when the game was called APEX RUSH
-if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), 'ApexRush'));
+// settings and progress live in %APPDATA%\Slamline; saves from before the rename sit in
+// %APPDATA%\ApexRush and move over on the first run (if that fails, keep using them where they are)
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+  const appData = app.getPath('appData');
+  let dir = path.join(appData, 'Slamline');
+  const old = path.join(appData, 'ApexRush');
+  if (!fs.existsSync(dir) && fs.existsSync(old)) {
+    try { fs.renameSync(old, dir); } catch { dir = old; }
+  }
+  app.setPath('userData', dir);
+}
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('force_high_performance_gpu');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -14,8 +24,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-// APEX_GAME_DIR lets a dev run point Electron at the live source folder
-const GAME_DIR = path.resolve(process.env.APEX_GAME_DIR || path.join(__dirname, 'game'));
+// SLAMLINE_GAME_DIR lets a dev run point Electron at the live source folder
+const GAME_DIR = path.resolve(process.env.SLAMLINE_GAME_DIR || path.join(__dirname, 'game'));
 
 app.whenReady().then(async () => {
   await session.defaultSession.clearCache();

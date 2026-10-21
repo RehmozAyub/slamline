@@ -13,7 +13,7 @@
         android:isGame="true"
         android:label="SLAMLINE"
         android:roundIcon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.Apex">
+        android:theme="@style/Theme.Slamline">
 
         <activity
             android:name=".MainActivity"

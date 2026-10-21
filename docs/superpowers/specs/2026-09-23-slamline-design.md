@@ -1,10 +1,10 @@
-# APEX RUSH — Design Spec
+# SLAMLINE — Design Spec
 
 A stylish arcade 3D racing game with Burnout-style aggression, shipped as a portable Windows `.exe`.
 
 ## Goals
 
-- Double-click `release\ApexRush.exe` → game runs. No install, no internet needed.
+- Double-click `release\Slamline.exe` → game runs. No install, no internet needed.
 - Good-looking: PBR cars with clearcoat paint, soft shadows, bloom, filmic tone mapping, heavy speed FX.
 - Stylish UI: bold italic condensed type (Windows' built-in *Bahnschrift*), angled panels, animated transitions.
 - Core loop: pick track + car → 3-lap race vs 5 AI → results.
@@ -13,7 +13,7 @@ A stylish arcade 3D racing game with Burnout-style aggression, shipped as a port
 
 - **Three.js** (vendored ES module, no bundler) rendered in **Electron**, packaged by **electron-builder** `portable` target.
 - Electron serves the game through a privileged custom `app://` protocol (ES modules don't load reliably from `file://`). WebGL context requests `powerPreference: "high-performance"` and Electron sets `ignore-gpu-blocklist` so the NVIDIA GPU is used.
-- Project stays tiny in Google Drive; `node_modules` and build happen on `C:` (`%LOCALAPPDATA%\ApexRushBuild`) via `build.ps1`, which copies the finished exe back to `release\`.
+- Project stays tiny in Google Drive; `node_modules` and build happen on `C:` (`%LOCALAPPDATA%\SlamlineBuild`) via `build.ps1`, which copies the finished exe back to `release\`.
 
 ```
 NFS_II_SE/
@@ -43,7 +43,7 @@ NFS_II_SE/
   electron/main.js, electron/package.json
   build.ps1
   tests/                node:test unit tests for pure logic (track math, race ordering, burnout rules)
-  release/ApexRush.exe
+  release/Slamline.exe
 ```
 
 ## Track model

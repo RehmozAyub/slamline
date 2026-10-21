@@ -1,8 +1,8 @@
 // Packages the game as an Android app: release/Slamline.apk
-// The toolchain (JDK 17, Android SDK, Gradle) and the Gradle build live in S:\ApexRushAndroid
-// (override with APEX_ANDROID_HOME) so nothing heavy syncs to Google Drive. First run downloads
+// The toolchain (JDK 17, Android SDK, Gradle) and the Gradle build live in S:\SlamlineAndroid
+// (override with SLAMLINE_ANDROID_HOME) so nothing heavy syncs to Google Drive. First run downloads
 // about 3 GB. `node tools/build-apk.mjs --setup` only installs the toolchain; `--debug` builds
-// release/ApexRush-debug.apk (debug key, WebView inspectable) for testing on an emulator.
+// release/Slamline-debug.apk (debug key, WebView inspectable) for testing on an emulator.
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, copyFileSync, statSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const home = process.env.APEX_ANDROID_HOME || 'S:\\ApexRushAndroid';
+const home = process.env.SLAMLINE_ANDROID_HOME || 'S:\\SlamlineAndroid';
 const JDK = join(home, 'jdk');
 const SDK = join(home, 'sdk');
 const GRADLE_VER = '8.11.1';
@@ -86,22 +86,28 @@ async function setup() {
 
 // Release signing key. It lives in android/signing (gitignored, but backed up with the Drive folder):
 // keep it, or phones need an uninstall (which wipes progress) before they take the next update.
-function signingKey() {
+// signing.properties names the key file; Gradle gets a copy with its full path (work/signing.properties),
+// so the repo folder can move.
+function signingKey(work) {
   const dir = join(root, 'android', 'signing');
   const props = join(dir, 'signing.properties');
-  if (existsSync(props)) return props;
-  mkdirSync(dir, { recursive: true });
-  const pass = randomBytes(18).toString('base64url');
-  const store = join(dir, 'apexrush-release.jks');
-  run(`"${join(JDK, 'bin', 'keytool.exe')}" -genkeypair -v -keystore "${store}" -alias apexrush -keyalg RSA -keysize 2048 -validity 10000 -storepass ${pass} -keypass ${pass} -dname "CN=APEX RUSH, O=APEX RUSH, C=DE"`);
-  writeFileSync(props, `storeFile=${store.replace(/\\/g, '/')}\nstorePassword=${pass}\nkeyAlias=apexrush\nkeyPassword=${pass}\n`);
-  return props;
+  if (!existsSync(props)) {
+    mkdirSync(dir, { recursive: true });
+    const pass = randomBytes(18).toString('base64url');
+    run(`"${join(JDK, 'bin', 'keytool.exe')}" -genkeypair -v -keystore "${join(dir, 'slamline-release.jks')}" -alias slamline -keyalg RSA -keysize 2048 -validity 10000 -storepass ${pass} -keypass ${pass} -dname "CN=SLAMLINE, O=SLAMLINE, C=DE"`);
+    writeFileSync(props, `storeFile=slamline-release.jks\nstorePassword=${pass}\nkeyAlias=slamline\nkeyPassword=${pass}\n`);
+  }
+  const staged = join(work, 'signing.properties');
+  const text = readFileSync(props, 'utf8').replace(/^storeFile=(.*)$/m, (_, f) => `storeFile=${join(dir, f.trim().split(/[\\/]/).pop()).replace(/\\/g, '/')}`);
+  mkdirSync(work, { recursive: true });
+  writeFileSync(staged, text);
+  return staged;
 }
 
 async function build() {
   await setup();
-  const props = signingKey();
   const work = join(home, 'build');
+  const props = signingKey(work);
   console.log('Staging files...');
   rmSync(join(work, 'app', 'src'), { recursive: true, force: true });
   cpSync(join(root, 'android'), work, { recursive: true, filter: (src) => !src.includes(`${join('android', 'signing')}`) });
@@ -111,7 +117,7 @@ async function build() {
   });
   writeFileSync(join(work, 'local.properties'), `sdk.dir=${SDK.replace(/\\/g, '/')}\nsigning=${props.replace(/\\/g, '/')}\n`);
   const version = JSON.parse(readFileSync(join(root, 'electron', 'package.json'), 'utf8')).version;
-  writeFileSync(join(work, 'version.properties'), `versionName=${process.env.APEX_VERSION || version}\nversionCode=${process.env.APEX_VERSION_CODE || Math.floor(Date.now() / 60000) - 29000000}\n`);
+  writeFileSync(join(work, 'version.properties'), `versionName=${process.env.SLAMLINE_VERSION || version}\nversionCode=${process.env.SLAMLINE_VERSION_CODE || Math.floor(Date.now() / 60000) - 29000000}\n`);
 
   console.log('Running Gradle...');
   const debug = process.argv.includes('--debug');

@@ -63,7 +63,7 @@ export const clampCars = (n) => Math.max(CAR_COUNT.min, Math.min(CAR_COUNT.max, 
 
 // Device: phones and tablets get touch controls, phone graphics presets and no split screen.
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-export const IS_APP = /ApexRushAndroid/.test(UA); // the Android app (android/)
+export const IS_APP = /SlamlineAndroid/.test(UA); // the Android app (android/)
 export const IS_MOBILE = IS_APP || /Android|iPhone|iPad|iPod|Mobile/i.test(UA)
   || (/Macintosh/.test(UA) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1); // iPadOS
 
@@ -100,10 +100,25 @@ export const AI_COUNT = 7;
 export const BOOST_SPEED = 1.32;
 export const BOOST_ACCEL = 1.7;
 
+const SETTINGS_KEY = 'slamline.settings';
+
+// Saves from before the rename used 'apexrush.' keys: carry the settings over once, drop the rest.
+function migrateStorage() {
+  try {
+    const old = localStorage.getItem('apexrush.settings');
+    if (old !== null && localStorage.getItem(SETTINGS_KEY) === null) localStorage.setItem(SETTINGS_KEY, old);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('apexrush.')) localStorage.removeItem(k);
+    }
+  } catch { /* storage unavailable */ }
+}
+
 export function loadSettings() {
   const def = { quality: 'auto', autoQ: null, steering: 'slider', vibration: true, motionBlur: true, master: 0.8, music: 0.55, assist: true, assist2: true, cars: 8, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
+  migrateStorage();
   try {
-    const s = JSON.parse(localStorage.getItem('apexrush.settings') || '{}');
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     const p = s.progress || {};
     return { ...def, ...s, bestLaps: { ...(s.bestLaps || {}) }, progress: { stars: { ...(p.stars || {}) }, signatures: { ...(p.signatures || {}) }, totalTakedowns: p.totalTakedowns || 0 } };
   } catch {
@@ -112,5 +127,5 @@ export function loadSettings() {
 }
 
 export function saveSettings(s) {
-  try { localStorage.setItem('apexrush.settings', JSON.stringify(s)); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
 }

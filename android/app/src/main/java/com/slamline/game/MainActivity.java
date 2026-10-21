@@ -1,4 +1,4 @@
-package com.apexrush.game;
+package com.slamline.game;
 
 import android.app.Activity;
 import android.content.Context;
@@ -25,9 +25,9 @@ import android.webkit.WebViewClient;
 import androidx.webkit.WebViewAssetLoader;
 
 /**
- * APEX RUSH on Android: a full-screen WebView that serves the bundled game (assets/game) from
+ * SLAMLINE on Android: a full-screen WebView that serves the bundled game (assets/game) from
  * https://appassets.androidplatform.net, so ES modules and workers load like on the web and the
- * game runs offline. The page talks to the phone through window.ApexAndroid (see Bridge).
+ * game runs offline. The page talks to the phone through window.SlamlineAndroid (see Bridge).
  */
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
         s.setSupportZoom(false);
-        s.setUserAgentString(s.getUserAgentString() + " ApexRushAndroid");
+        s.setUserAgentString(s.getUserAgentString() + " SlamlineAndroid");
 
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .setDomain(HOST)
@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
             readInsets(wi);
             return v.onApplyWindowInsets(wi);
         });
-        web.addJavascriptInterface(new Bridge(), "ApexAndroid");
+        web.addJavascriptInterface(new Bridge(), "SlamlineAndroid");
         web.loadUrl("https://" + HOST + "/game/index.html");
     }
 
@@ -127,14 +127,14 @@ public class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        web.evaluateJavascript("window.__apexBack ? window.__apexBack() : false", (handled) -> {
+        web.evaluateJavascript("window.__slamBack ? window.__slamBack() : false", (handled) -> {
             if (!"true".equals(handled)) finish();
         });
     }
 
     @Override
     protected void onPause() {
-        web.evaluateJavascript("window.__apexPause && window.__apexPause()", null);
+        web.evaluateJavascript("window.__slamPause && window.__slamPause()", null);
         web.onPause();
         super.onPause();
     }
@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    /** window.ApexAndroid in the page. */
+    /** window.SlamlineAndroid in the page. */
     private class Bridge {
         @JavascriptInterface
         public void vibrate(int ms, int strength) {

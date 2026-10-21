@@ -4,15 +4,35 @@
 // sendState(buf) / onState for car states (unordered, never resent: a late state is useless).
 //
 // The real thing is WebRTC via PeerJS (vendor/peerjs). PeerJS's free cloud broker only does
-// the handshake; the games then talk directly. PeerJS opens the reliable channel; the fast one
+// the handshake; the games then talk directly, or through a relay when the two networks have no
+// direct route (see iceServers). PeerJS opens the reliable channel; the fast one
 // is a second, pre-negotiated data channel on the same connection (no extra signalling).
 // SimLink fakes a connection with lag, jitter and loss for tests: in one page (simPair) or
 // between two tabs of the same browser (BroadcastChannel, ?netsim in the URL).
 import { makeCode, peerId } from './protocol.js';
 
-const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
+// STUN only finds a direct route; some pairs of networks have none, and then the games need a
+// relay (TURN). The relay settings live in net-config.json on the game's website, so the exe and
+// the phone app pick up a new relay without an update:
+//   { "turn": "<url that returns ICE servers>" }  or  { "iceServers": [...] }
+const NET_CONFIG = 'https://rehmozayub.github.io/slamline/net-config.json';
 const FAST_ID = 42; // data channel id for car states (PeerJS's own channel uses a low id)
-const TIMEOUT = { broker: 10000, join: 15000 };
+const TIMEOUT = { broker: 10000, join: 15000, config: 3000 };
+
+async function iceServers() {
+  const get = async (url) => {
+    const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT.config) });
+    if (!r.ok) throw new Error(`${url}: ${r.status}`);
+    return r.json();
+  };
+  try {
+    const cfg = await get(NET_CONFIG);
+    let relay = cfg.iceServers || [];
+    if (cfg.turn) { const j = await get(cfg.turn); relay = Array.isArray(j) ? j : j.iceServers || []; }
+    return [...STUN, ...relay];
+  } catch { return STUN; } // no relay: direct routes still work
+}
 
 export class NetError extends Error {
   constructor(code, text) { super(text); this.code = code; this.text = text; }
@@ -40,7 +60,7 @@ class PeerLink extends Link {
     this.conn = conn;
     this.peer = peer;
     const pc = conn.peerConnection;
-    this.fast = pc.createDataChannel('apex-state', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
+    this.fast = pc.createDataChannel('slam-state', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
     this.fast.binaryType = 'arraybuffer';
     this.fast.onmessage = (e) => { if (this.onState) this.onState(e.data); };
     conn.on('data', (d) => { if (this.onMessage) this.onMessage(d); });
@@ -96,10 +116,10 @@ function brokerError(e) {
 // rejoins in the lobby). Resolves to { code, close() } once the code is registered.
 export async function host(onGuest, onError = () => {}) {
   if (simMode()) return simHost(onGuest);
-  const { Peer } = await loadPeerJS();
+  const [{ Peer }, ice] = await Promise.all([loadPeerJS(), iceServers()]);
   for (let attempt = 0; attempt < 4; attempt++) {
     const code = makeCode();
-    const peer = new Peer(peerId(code), { config: { iceServers: ICE }, debug: 0 });
+    const peer = new Peer(peerId(code), { config: { iceServers: ice }, debug: 0 });
     const ok = await new Promise((resolve) => {
       const t = setTimeout(() => resolve(new NetError('broker', "CAN'T REACH THE ONLINE SERVICE")), TIMEOUT.broker);
       peer.on('open', () => { clearTimeout(t); resolve(true); });
@@ -125,8 +145,8 @@ export async function host(onGuest, onError = () => {}) {
 // Join the game with this code. Resolves to a Link, or rejects with a NetError.
 export async function join(code) {
   if (simMode()) return simJoin(code);
-  const { Peer } = await loadPeerJS();
-  const peer = new Peer({ config: { iceServers: ICE }, debug: 0 });
+  const [{ Peer }, ice] = await Promise.all([loadPeerJS(), iceServers()]);
+  const peer = new Peer({ config: { iceServers: ice }, debug: 0 });
   return new Promise((resolve, reject) => {
     let done = false;
     const fail = (err) => { if (done) return; done = true; clearTimeout(t); peer.destroy(); reject(err); };
@@ -221,7 +241,7 @@ function simOpts() {
 }
 
 function simChannel(code, me) {
-  const bc = new BroadcastChannel(`apexrush-sim-${code}`);
+  const bc = new BroadcastChannel(`slamline-sim-${code}`);
   const link = new SimLink((kind, data) => bc.postMessage({ from: me, kind, data }), simOpts());
   bc.onmessage = (e) => { if (e.data.from !== me) link.deliver(e.data.kind, e.data.data); };
   const close = link.close.bind(link);
@@ -231,7 +251,7 @@ function simChannel(code, me) {
 
 async function simHost(onGuest) {
   const code = makeCode();
-  const lobby = new BroadcastChannel('apexrush-sim-lobby');
+  const lobby = new BroadcastChannel('slamline-sim-lobby');
   const links = new Set();
   lobby.onmessage = (e) => {
     if (e.data.type !== 'join' || e.data.code !== code) return;
@@ -245,7 +265,7 @@ async function simHost(onGuest) {
 
 function simJoin(code) {
   return new Promise((resolve, reject) => {
-    const lobby = new BroadcastChannel('apexrush-sim-lobby');
+    const lobby = new BroadcastChannel('slamline-sim-lobby');
     const t = setTimeout(() => { lobby.close(); reject(new NetError('nogame', 'NO GAME WITH THAT CODE')); }, 3000);
     const gid = Math.random().toString(36).slice(2, 8);
     lobby.onmessage = (e) => {

@@ -1,4 +1,4 @@
-// APEX RUSH Android shell. tools/build-apk.mjs writes local.properties (SDK + signing key)
+// SLAMLINE Android shell. tools/build-apk.mjs writes local.properties (SDK + signing key)
 // and version.properties before it runs Gradle, and copies game/ into src/main/assets/game.
 plugins {
     id 'com.android.application'
@@ -14,11 +14,11 @@ def signing = props(local.getProperty('signing'))
 def version = props('../version.properties')
 
 android {
-    namespace 'com.apexrush.game'
+    namespace 'com.slamline.game'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.apexrush.game'
+        applicationId 'com.slamline.game'
         minSdk 24
         targetSdk 35
         versionCode version.getProperty('versionCode') as int

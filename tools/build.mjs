@@ -1,12 +1,12 @@
 // Packages the game as a portable Windows exe: release/Slamline.exe
-// Build happens in %LOCALAPPDATA%\ApexRushBuild so node_modules never syncs to Google Drive.
+// Build happens in %LOCALAPPDATA%\SlamlineBuild so node_modules never syncs to Google Drive.
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const build = join(process.env.LOCALAPPDATA || join(root, '.build'), 'ApexRushBuild');
+const build = join(process.env.LOCALAPPDATA || join(root, '.build'), 'SlamlineBuild');
 mkdirSync(build, { recursive: true });
 
 const run = (cmd) => execSync(cmd, { cwd: build, stdio: 'inherit' });

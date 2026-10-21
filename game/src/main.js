@@ -1,4 +1,4 @@
-// SLAMLINE (formerly APEX RUSH) - boot, menus, game-state machine and main loop.
+// SLAMLINE - boot, menus, game-state machine and main loop.
 import * as THREE from 'three';
 import { Renderer } from './renderer.js';
 import { Input, keyPlayer } from './input.js';
@@ -650,14 +650,14 @@ class Game {
   // --- phones -----------------------------------------------------------------------
   bindDevice() {
     // the Android app's back button: false = not used here (title screen), so the app closes
-    window.__apexBack = () => {
+    window.__slamBack = () => {
       if (this.state === 'title') return false;
       if (this.state === 'results') this.quitToMenu();
       else if (this.state !== 'loading') this.onAction('back', 'android');
       return true;
     };
     // switching away from the game (app to background, phone call): pause and mute
-    window.__apexPause = () => this.toBackground();
+    window.__slamPause = () => this.toBackground();
     if (IS_MOBILE) document.addEventListener('visibilitychange', () => { if (document.hidden) this.toBackground(); else this.audio.resume(); });
     // phone browser: the first tap goes fullscreen and locks landscape where the browser allows it
     if (IS_MOBILE && !IS_APP && document.documentElement.requestFullscreen) {
@@ -669,9 +669,9 @@ class Game {
       }, { once: true });
     }
     // Android app: keep the HUD clear of the camera cutout
-    if (window.ApexAndroid) {
+    if (window.SlamlineAndroid) {
       const insets = () => {
-        const [l, t, r, b] = String(window.ApexAndroid.insets()).split(',').map((v) => Number(v) || 0);
+        const [l, t, r, b] = String(window.SlamlineAndroid.insets()).split(',').map((v) => Number(v) || 0);
         const st = document.documentElement.style;
         st.setProperty('--sl', `${l}px`); st.setProperty('--st', `${t}px`); st.setProperty('--sr', `${r}px`); st.setProperty('--sb', `${b}px`);
       };
@@ -697,7 +697,7 @@ class Game {
   }
 
   buzz(ms, strength = 180) {
-    if (window.ApexAndroid) window.ApexAndroid.vibrate(ms, strength);
+    if (window.SlamlineAndroid) window.SlamlineAndroid.vibrate(ms, strength);
     else if (navigator.vibrate) navigator.vibrate(ms);
   }
 
