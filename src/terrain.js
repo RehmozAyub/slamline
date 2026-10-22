@@ -38,14 +38,19 @@ export function makeHeightFn(index, natural, { hw, near = -1.4, blendStart = 14,
   };
 }
 
-export function buildTerrain({ size, res, center = [0, 0], heightAt, colorAt, material }) {
-  const g = new THREE.PlaneGeometry(size, size, res, res);
+// size and res: one number for a square, or [x, z] for a rectangle; angle turns it about its
+// centre (the local z axis points along (sin angle, cos angle))
+export function buildTerrain({ size, res, center = [0, 0], angle = 0, heightAt, colorAt, material }) {
+  const [w, d] = Array.isArray(size) ? size : [size, size], [rw, rd] = Array.isArray(res) ? res : [res, res];
+  const g = new THREE.PlaneGeometry(w, d, rw, rd);
   g.rotateX(-Math.PI / 2);
   const pos = g.attributes.position;
   const colors = new Float32Array(pos.count * 3);
   const col = new THREE.Color();
+  const cs = Math.cos(angle), sn = Math.sin(angle);
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i) + center[0], z = pos.getZ(i) + center[1];
+    const lx = pos.getX(i), lz = pos.getZ(i);
+    const x = center[0] + lx * cs + lz * sn, z = center[1] - lx * sn + lz * cs;
     const h = heightAt(x, z);
     pos.setXYZ(i, x, h, z);
   }
@@ -59,7 +64,32 @@ export function buildTerrain({ size, res, center = [0, 0], heightAt, colorAt, ma
   const mat = material || addWorldDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }), { fine: [0.32, 0.42], macro: [0.012, 0.35], rough: 0.1, triplanar: true });
   const mesh = new THREE.Mesh(g, mat);
   mesh.receiveShadow = true;
+  mesh.userData.frame = { center, w, d, rw, rd, cs, sn };
   return mesh;
+}
+
+// Where (x, z) is in a terrain mesh made by buildTerrain: its local position and how far in
+// from the nearest edge (negative outside)
+export function terrainLocal(mesh, x, z) {
+  const { center, w, d, cs, sn } = mesh.userData.frame;
+  const dx = x - center[0], dz = z - center[1];
+  const lx = dx * cs - dz * sn, lz = dx * sn + dz * cs;
+  return { lx, lz, inset: Math.min(w / 2 - Math.abs(lx), d / 2 - Math.abs(lz)) };
+}
+
+// A fast height lookup from a terrain mesh made by buildTerrain (bilinear between its vertices,
+// so it follows the ground as drawn); null outside it. Read before the mesh is changed.
+export function terrainSampler(mesh) {
+  const { w, d, rw, rd } = mesh.userData.frame, p = mesh.geometry.attributes.position, n = rw + 1;
+  const ys = new Float32Array(p.count);
+  for (let k = 0; k < p.count; k++) ys[k] = p.getY(k);
+  return (x, z) => {
+    const { lx, lz } = terrainLocal(mesh, x, z);
+    const fx = ((lx + w / 2) / w) * rw, fz = ((lz + d / 2) / d) * rd;
+    if (fx < 0 || fz < 0 || fx > rw || fz > rd) return null;
+    const ix = Math.min(rw - 1, Math.floor(fx)), iz = Math.min(rd - 1, Math.floor(fz)), u = fx - ix, v = fz - iz, k = iz * n + ix;
+    return (ys[k] * (1 - u) + ys[k + 1] * u) * (1 - v) + (ys[k + n] * (1 - u) + ys[k + n + 1] * u) * v;
+  };
 }
 
 // Distant mountain ring for backdrops.

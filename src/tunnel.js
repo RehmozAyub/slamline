@@ -144,6 +144,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     }
     const { inner: innerMat, outer: outerMat, gutter: gutterMat } = made[t.style];
     const rockA = new THREE.Color(st.rock ? st.rock[0] : st.slab), rockB = new THREE.Color(st.rock ? st.rock[1] : st.slab), rc = new THREE.Color();
+    const grass = st.grass ? new THREE.Color(st.grass) : null;
     const ia = Math.floor(t.a / track.step), ib = Math.ceil(t.b / track.step);
     const rows = [];
     for (let i = ia; i <= ib; i += 2) rows.push(((i % track.n) + track.n) % track.n);
@@ -160,11 +161,14 @@ export function buildTunnels(track, tunnels, overrides = {}) {
         inner.push(x + rx * li, y + hi, z + rz * li);
         if (k) { const [pl, ph] = innerAt(st, hw, k - 1); along += Math.hypot(li - pl, hi - ph); }
         inUv.push(st.profile === 'box' ? along / 8 : (k / N) * 2.5, (r * 2 * track.step) / (st.profile === 'box' ? 8 : 16));
-        const [lo, ho] = outerAt(st, hw, k, (st.top ?? 0) - y);
+        let [lo, ho] = outerAt(st, hw, k, (st.top ?? 0) - y);
+        // a hill can sink toward its ends (swell) and be craggy (crag) instead of smooth
+        if (st.swell) ho = -7 + (ho + 7) * (1 - st.swell * (1 - Math.sin((Math.PI * r) / (rows.length - 1))));
         const ox = x + rx * lo, oz = z + rz * lo;
-        const bump = st.hull === 'slab' ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14;
+        const bump = st.hull === 'slab' ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
         outer.push(ox + rx * bump * 0.3, y + ho + bump, oz + rz * bump * 0.3);
         rc.copy(rockA).lerp(rockB, fbm(ox * 0.02, oz * 0.02, 2));
+        if (grass) rc.lerp(grass, Math.min(1, Math.max(0, (Math.sin(Math.PI * (k / N)) - 0.72) / 0.18)) * 0.9); // grass over the top
         outCol.push(rc.r, rc.g, rc.b);
       }
       if (st.lamps === 'warm' && r % 6 === 3) lamps.push({ x, y: y + st.height - 0.6, z, ry: Math.atan2(track.tx[i], track.tz[i]) });
