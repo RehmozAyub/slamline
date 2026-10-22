@@ -291,7 +291,7 @@ export function railStep(v, c, dt, mul = 1, steerable = true) {
     v.air = true;
     v.airY = pose.y;
     v.vy = vF * pose.ty + rail.release.launch;
-    v.airTime = 0; v.trick = null; v.trickKind = 'spin';
+    v.airTime = 0; v.airG = 0; v.trick = null; v.trickKind = 'spin';
     v.lastGround = p.y; v.vyGround = 0;
     v.y = pose.y;
     v.pose = null;

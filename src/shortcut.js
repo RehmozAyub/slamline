@@ -386,8 +386,8 @@ export const AIR = {
 };
 
 function timeToGround(v, ground) {
-  const above = Math.max(0, v.airY - ground);
-  return (v.vy + Math.sqrt(Math.max(0, v.vy * v.vy + 2 * AIR.gravity * above))) / AIR.gravity;
+  const above = Math.max(0, v.airY - ground), g = v.airG || AIR.gravity;
+  return (v.vy + Math.sqrt(Math.max(0, v.vy * v.vy + 2 * g * above))) / g;
 }
 
 // Begin a flat spin / barrel roll that completes one turn exactly as the car lands.
@@ -417,6 +417,7 @@ function airStep(v, ground, dt, ramp, tangent = null) {
       v.vy = ramp && ramp.launch ? ramp.launch : Math.min(AIR.maxLaunch, Math.max(0, v.vyGround ?? 0));
       v.airY = last;
       v.airTime = 0;
+      v.airG = AIR.gravity * (ramp && ramp.gravity ? ramp.gravity : 1); // (a low-gravity jump floats)
       v.trick = null;
       v.yawRate = 0;
       v.trickKind = ramp && ramp.half ? 'roll' : 'spin';
@@ -429,7 +430,7 @@ function airStep(v, ground, dt, ramp, tangent = null) {
     }
   }
   if (v.air) {
-    v.vy -= AIR.gravity * dt;
+    v.vy -= (v.airG || AIR.gravity) * dt;
     v.airY += v.vy * dt;
     v.airTime += dt;
     // a late trick: drift + steer early in the jump still has time to come round
@@ -457,6 +458,7 @@ function airStep(v, ground, dt, ramp, tangent = null) {
     }
     if (v.airY <= ground) {
       v.air = false;
+      v.airG = 0;
       v.vyGround = 0;
       const t = v.trick;
       (v.events || (v.events = [])).push({ type: 'land', airTime: v.airTime, trick: t ? (t.kind === 'spin' && t.target > Math.PI * 3 ? 'donut' : t.kind) : null, clean: !t || t.angle > t.target - Math.PI * 0.4, impact: -v.vy });

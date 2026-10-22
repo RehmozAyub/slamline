@@ -4,6 +4,7 @@
 //   subway  - a cut-and-cover tunnel: tiled box with strip lights, a concrete roof at street level
 //   temple  - through the base of a stepped jungle temple: a corbel vault of carved blocks whose
 //             glyphs glow, torches, moss on the top terraces
+//   wormhole - a tube of swirling light hanging in space (no hull: the swirl shows outside too)
 //   brick   - a brick-vaulted passage under a building (the map dresses the building round it)
 //   arcade  - a market hall: a glass and iron barrel roof on columns, open on both sides
 //   gallery - an avalanche gallery: a concrete roof against the mountain (spec.side: the mountain's
@@ -22,6 +23,7 @@ export const TUNNEL_STYLES = {
   seacave: { profile: 'cave', width: 6, height: 13, jitter: 1.6, hull: 'mountain', hullH: 30, inner: 'wetrock', glow: 0x2ae0d0, glowI: 1.4, gutter: 'glowWater', lamps: null, rock: [0x4a3a30, 0x7a6450] },
   subway: { profile: 'box', width: 3.5, height: 7, hull: 'slab', top: 0.3, inner: 'tiles', band: '#d0206a', gutter: null, lamps: 'strip', slab: 0x55565c },
   temple: { profile: 'corbel', width: 3, height: 12, hull: 'temple', inner: 'glyphs', glow: 0x3dff8a, glowI: 1.6, gutter: null, lamps: 'warm', rock: [0x55574c, 0x707264], grass: 0x3f6a2c },
+  wormhole: { profile: 'arch', width: 4, height: 14, jitter: 0, hull: 'none', inner: 'wormhole', gutter: null, lamps: null, shade: 0.85 },
   brick: { profile: 'arch', width: 2.5, height: 9, hull: 'slab', top: 17, inner: 'brick', glow: 0xffb060, glowI: 0.5, gutter: null, lamps: 'warm', slab: 0x6e3226 },
   arcade: { profile: 'vault', width: 2.5, height: 9.5, hull: 'vault', inner: 'ironglass', glow: 0xfff0d8, glowI: 0.55, gutter: null, lamps: null, slab: 0x2a3230, pillars: 6, open: 'both', shade: 0.3 },
   gallery: { profile: 'gallery', width: 3, height: 8, hull: 'gallery', inner: 'concrete', gutter: null, lamps: 'warm', slab: 0xa8a49c, roof: 0xf2f5fa, pillars: 7, shade: 0.45 },
@@ -179,6 +181,27 @@ const innerTextures = {
   },
 };
 
+// the wormhole's skin: spiralling bands of colour and rings of light racing along it
+function wormholeMaterial() {
+  return new THREE.ShaderMaterial({
+    side: THREE.DoubleSide,
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform float uTime; varying vec2 vUv;
+      void main() {
+        float a = vUv.x / 2.5 * 6.2832;
+        float swirl = sin(a * 3.0 + vUv.y * 9.0 - uTime * 5.0);
+        float twist = sin(a * 2.0 - vUv.y * 5.0 + uTime * 2.6);
+        float rings = smoothstep(0.86, 1.0, sin(vUv.y * 22.0 - uTime * 12.0));
+        vec3 col = mix(vec3(0.3, 0.08, 0.85), vec3(0.08, 0.85, 1.0), 0.5 + 0.5 * swirl);
+        col = mix(col, vec3(1.0, 0.25, 0.75), 0.25 + 0.25 * twist);
+        col = col * (0.45 + 0.4 * smoothstep(-0.2, 1.0, swirl * twist)) + vec3(0.7, 0.85, 1.0) * rings * 0.6;
+        gl_FragColor = vec4(col * 0.95, 1.0);
+      }`,
+  });
+}
+
 // --- cross-sections: k = 0..N from the left foot, over the top, to the right foot -----------
 const N = 24;
 // a point `f` (0-1) of the way along a polyline, by length
@@ -249,8 +272,8 @@ export function buildTunnels(track, tunnels, overrides = {}) {
   for (const t of tunnels) {
     const st = { ...TUNNEL_STYLES[t.style] || TUNNEL_STYLES.lava, ...(overrides[t.style] || {}) };
     if (!made[t.style]) {
-      const tx = innerTextures[st.inner](st);
-      const inner = new THREE.MeshStandardMaterial({ map: tx.map, emissiveMap: tx.emissive, emissive: new THREE.Color(st.glow ?? 0xffffff), emissiveIntensity: st.glowI ?? 1, roughness: st.inner === 'tiles' ? 0.35 : 0.85, side: THREE.DoubleSide });
+      const tx = st.inner === 'wormhole' ? null : innerTextures[st.inner](st);
+      const inner = st.inner === 'wormhole' ? wormholeMaterial() : new THREE.MeshStandardMaterial({ map: tx.map, emissiveMap: tx.emissive, emissive: new THREE.Color(st.glow ?? 0xffffff), emissiveIntensity: st.glowI ?? 1, roughness: st.inner === 'tiles' ? 0.35 : 0.85, side: THREE.DoubleSide });
       const outer = st.hull === 'slab'
         ? addWorldDetail(new THREE.MeshStandardMaterial({ color: st.slab, roughness: 0.9, side: THREE.DoubleSide }), { fine: [0.6, 0.4], macro: [0.03, 0.3], rough: 0.1, triplanar: true })
         : addWorldDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true, side: THREE.DoubleSide }), { fine: [0.25, 0.5], macro: [0.02, 0.3], rough: 0.1, triplanar: true });
@@ -260,6 +283,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
         gutter.side = THREE.DoubleSide;
         animated.push(gutter);
       }
+      if (st.inner === 'wormhole') animated.push(inner);
       made[t.style] = { inner, outer, gutter };
     }
     const { inner: innerMat, outer: outerMat, gutter: gutterMat } = made[t.style];
@@ -317,7 +341,8 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     tin.receiveShadow = true;
     const tout = new THREE.Mesh(strip(outer, [['color', outCol, 3]]), outerMat);
     tout.castShadow = true; tout.receiveShadow = true;
-    group.add(tin, tout);
+    group.add(tin);
+    if (st.hull !== 'none') group.add(tout);
     if (gallery || hall) {
       // the roof's underside out to the overhang (both eaves on a hall), and pillars along the
       // open side (both sides of a hall: slim iron columns)
@@ -350,7 +375,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
       group.add(instanced(post, new THREE.MeshStandardMaterial({ color: st.slab, roughness: hall ? 0.5 : 0.9, metalness: hall ? 0.5 : 0 }), posts));
     }
     // portal faces: the ring between the inside and the outside at both ends
-    for (const r of [0, rows.length - 1]) {
+    for (const r of st.hull === 'none' ? [] : [0, rows.length - 1]) {
       const pos = [], col = [], idx = [];
       for (let k = 0; k <= N; k++) {
         const o = (r * (N + 1) + k) * 3;

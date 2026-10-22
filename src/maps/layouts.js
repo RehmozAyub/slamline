@@ -235,6 +235,12 @@ const LAYOUTS_BASE = {
       harmonics: [[2, 0.12, 2.6], [3, 0.14, 0.9], [4, 0.06, 0.1], [5, 0.04, 1.7], [7, 0.02, 2.9]],
       elevation: (th) => 60 + 14 * Math.sin(2 * th + 0.7) + 7 * Math.sin(3 * th + 2.1) + 3 * Math.sin(5 * th),
     }),
+    // the low-gravity gap, the wormhole, the DNA corkscrew through the great stargate
+    features: [
+      { type: 'jump', at: [338.6, 230.7], gap: 70, ramp: 26, h: 3.4, launch: 9, minSpeed: 56, lowG: 0.4, sign: 'LOW GRAVITY' },
+      { type: 'tunnel', from: [148.3, 248], to: [21.6, 326], style: 'wormhole' },
+      { type: 'corkscrew', from: [-412.6, -103.4], to: [-365.7, -190.3], radius: 11 },
+    ],
   },
   // SKYPORT: around an airport; the long south straight is the runway
   airport: {
