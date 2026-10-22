@@ -11,7 +11,6 @@ import { addWorldDetail } from '../detail.js';
 import { windowTextures, textTexture, radialTexture } from '../textures.js';
 import { TUNNEL_STYLES } from '../tunnel.js';
 
-const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const CONTAINER = [0xc83a2a, 0x2a6ab0, 0x3a8a4a, 0xe8a020, 0x8a8e94, 0x6a3a8a, 0xd86a20];
 
 const LIVERY = [0xd01828, 0x1a4ab0, 0x0a8a5a, 0xff8a00, 0x5a2ab0, 0x18a8d8, 0x222428];

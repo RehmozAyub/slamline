@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { LAYOUTS } from './layouts.js';
 import { fbm } from '../terrain.js';
-import { rng, colored, merge, instanced } from '../scenery.js';
+import { rng, colored, instanced } from '../scenery.js';
 import { radialTexture } from '../textures.js';
 
 const smoother = (f) => f * f * f * (f * (f * 6 - 15) + 10); // as the corkscrew twists (rail.js)
