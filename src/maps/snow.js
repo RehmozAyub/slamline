@@ -4,7 +4,7 @@
 // in the slopes, a waterfall hangs frozen on a cliff and snowcats groom the pistes.
 import * as THREE from 'three';
 import { LAYOUTS } from './layouts.js';
-import { fbm, noise2, makeHeightFn, buildTerrain, mountainRing } from '../terrain.js';
+import { fbm, makeHeightFn, buildTerrain, mountainRing } from '../terrain.js';
 import { rng, colored, merge, instanced, scatter } from '../scenery.js';
 import { radialTexture } from '../textures.js';
 
