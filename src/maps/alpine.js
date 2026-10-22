@@ -191,8 +191,16 @@ export default {
     const G = TUNNEL_STYLES.gallery, galW = hw + G.width, galTop = G.height + 1;
     const galSide = gal ? gal.spec.side ?? -1 : -1;
 
-    // the hillside over the gallery: up from behind its roof on the mountain's side
+    // the hillside over the gallery: up from behind its roof on the mountain's side (a box
+    // round it saves the second road lookup everywhere else)
+    let galBox = null;
+    if (gal) {
+      galBox = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let sv = gal.a - 30; sv <= gal.b + 30; sv += 10) { const p = track.pointAt(track.wrapS(sv), 0); galBox = [Math.min(galBox[0], p.x), Math.min(galBox[1], p.z), Math.max(galBox[2], p.x), Math.max(galBox[3], p.z)]; }
+      galBox = [galBox[0] - 180, galBox[1] - 180, galBox[2] + 180, galBox[3] + 180];
+    }
     const hillside = (x, z, h) => {
+      if (x < galBox[0] || z < galBox[1] || x > galBox[2] || z > galBox[3]) return h;
       const n = index.nearest(x, z, 2);
       if (!isFinite(n.dist) || n.dist < 15) return h;
       const s = n.idx * step;

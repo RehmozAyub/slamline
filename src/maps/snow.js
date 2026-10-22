@@ -23,12 +23,12 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 
 // lake ice: pale blue with darker depths, white cracks and frozen bubbles
 function iceTexture() {
-  const S = 1024, c = document.createElement('canvas');
+  const S = 512, c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d'), img = g.createImageData(S, S);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const ax = (x / S) * Math.PI * 2, ay = (y / S) * Math.PI * 2;
-    const v = fbm(Math.cos(ax) * 2 + 5, Math.sin(ax) * 2 + Math.cos(ay) * 2 + Math.sin(ay), 4);
+    const v = fbm(Math.cos(ax) * 2 + 5, Math.sin(ax) * 2 + Math.cos(ay) * 2 + Math.sin(ay), 3);
     const i = (y * S + x) * 4;
     img.data[i] = 150 + v * 70; img.data[i + 1] = 188 + v * 50; img.data[i + 2] = 214 + v * 30; img.data[i + 3] = 255;
   }
@@ -39,16 +39,16 @@ function iceTexture() {
     g.lineWidth = w;
     g.beginPath(); g.moveTo(x, y);
     for (let k = 0; k < len; k++) {
-      a += (rand() - 0.5) * 0.9; x += Math.cos(a) * 9; y += Math.sin(a) * 9;
+      a += (rand() - 0.5) * 0.9; x += Math.cos(a) * 4.5; y += Math.sin(a) * 4.5;
       g.lineTo(x, y);
       if (rand() < 0.08 && w > 0.8) { g.stroke(); crack(x, y, a + (rand() - 0.5) * 2.4, len * 0.4, w * 0.6); g.lineWidth = w; g.beginPath(); g.moveTo(x, y); }
     }
     g.stroke();
   };
   g.strokeStyle = 'rgba(240,250,255,0.75)';
-  for (let k = 0; k < 16; k++) crack(rand() * S, rand() * S, rand() * 6.28, 30 + rand() * 40, 1.6 + rand());
+  for (let k = 0; k < 16; k++) crack(rand() * S, rand() * S, rand() * 6.28, 30 + rand() * 40, 1 + rand() * 0.6);
   g.fillStyle = 'rgba(255,255,255,0.35)';
-  for (let k = 0; k < 300; k++) { g.beginPath(); g.arc(rand() * S, rand() * S, 1 + rand() * 2.5, 0, 6.28); g.fill(); }
+  for (let k = 0; k < 300; k++) { g.beginPath(); g.arc(rand() * S, rand() * S, 0.6 + rand() * 1.4, 0, 6.28); g.fill(); }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
@@ -246,7 +246,7 @@ export default {
           const lat = -w + (2 * w * k) / C;
           track.pointAt(track.wrapS(sv), lat, P);
           const y = track.pointAt(track.wrapS(sv), 0).y + 0.03;
-          pos.push(P.x, y, P.z); uv.push(lat / 36, sv / 36);
+          pos.push(P.x, y, P.z); uv.push(lat / 24, sv / 24);
         }
       }
       for (let r = 0; r < rows - 1; r++) for (let k = 0; k < C; k++) {
