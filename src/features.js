@@ -127,7 +127,7 @@ export function layoutFeatures(track, layout) {
   for (const r of rails) r.flattenCurvature();
   for (const b of banks) b.relaxCurvature();
   const avoid = [
-    ...rails.map((r) => [r.sA - 90, r.sB + 70]),
+    ...rails.map((r) => [r.sA - 90, r.sB + (r.release ? 140 : 70)]), // (off a helix: where cars land)
     ...jumps.map((j) => [j.sRamp - 80, j.sLand + 80]),
     ...banks.map((b) => [b.s0 - 40, b.s1 + 40]),
     ...tunnels.map((t) => [t.a - 60, t.b + 60]),

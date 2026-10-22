@@ -240,12 +240,17 @@ function straightestLip(sc) {
 }
 
 function withFeatures(list) {
+  // the half ramp needs a straight run-up and landing (a car in the air flies straight, and a
+  // flat-out car hugs the outside of a bend into the lip): it goes on the next shortcut that has
+  // one, and a shortcut that bends gets the boost ring
+  const lips = list.map((sc) => straightestLip(sc));
+  const half = list.findIndex((sc, k) => k > 0 && sc.path.maxCurvatureAhead(lips[k] - 60, 170) < 0.0025);
   list.forEach((sc, k) => {
     sc.id = k;
     sc.fence = k > 0;
-    const lip = straightestLip(sc);
+    const lip = lips[k];
     if (k === 0) sc.ramps = [{ u0: lip - 10, len: 10, h: 1.7, half: 0 }];
-    else if (k === 1) sc.ramps = [{ u0: lip - 8, len: 8, h: 1.4, half: -sc.side }];
+    else if (k === half) sc.ramps = [{ u0: lip - 8, len: 8, h: 1.4, half: -sc.side }];
     else { sc.ramps = []; sc.boostRing = true; }
   });
   return list;

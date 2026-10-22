@@ -69,6 +69,18 @@ function canalHump(x, z) {
 // Every layout is scaled up from its design size (longer laps, room for the shortcuts).
 export const LAYOUT_SCALE = 1.2;
 
+// NEON CITY's subway dive (design-size coordinates): along the west side (x = -420) the road
+// ramps down from z = top to the tunnel floor `depth` metres below the street, runs flat under
+// it between `flat`, and climbs back up by z = bottom.
+export const CITY_SUBWAY = { x: -420, top: 170, flat: [92, -58], bottom: -136, depth: 9 };
+function cityY(x, z) {
+  const S = CITY_SUBWAY;
+  if (Math.abs(x - S.x) > 40) return 0;
+  const step = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+  const down = step((S.top - z) / (S.top - S.flat[0])), up = step((z - S.bottom) / (S.flat[1] - S.bottom));
+  return -S.depth * Math.min(down, up);
+}
+
 // MAGMA CORE (design-size coordinates): a ring road round the lava lake on the caldera floor,
 // two lava-tube tunnels and a loop-the-loop on the north straight. The loop needs a sideways
 // jog in the road: its exit comes down LOOP_JOG.offset metres (world) to the right of its entry.
@@ -107,7 +119,15 @@ const LAYOUTS_BASE = {
         [70, 300], [70, 130], [-190, 130], [-190, 300], [-420, 300],
       ],
       [60, 42, 42, 60, 55, 42, 42, 42, 42, 60],
+      cityY,
+      15,
     ),
+    // the car-park helix with its roof jump, the neon wall-ride, the subway under the west side
+    features: [
+      { type: 'helix', at: [-245.9, -260], radius: 24, turns: 2, rise: 14, side: -1, run: 40, launch: 4 },
+      { type: 'bank', from: [331.9, -110.1], to: [430.1, -11.5], side: -1, angle: 1.4, look: { glow: 0x19e3ff, glowIntensity: 3.4, wall: 0x2a2c36, back: 0x1a1a22 } },
+      { type: 'tunnel', from: [-420, CITY_SUBWAY.flat[0]], to: [-420, CITY_SUBWAY.flat[1]], style: 'subway' },
+    ],
   },
   alpine: {
     width: 18,
