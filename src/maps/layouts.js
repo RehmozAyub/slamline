@@ -198,6 +198,13 @@ const LAYOUTS_BASE = {
       harmonics: [[2, 0.2, 0.3], [3, 0.1, 1.2], [4, 0.07, 2.2], [6, 0.035, 1.0], [9, 0.012, 0.4]],
       elevation: (th) => 20 + 10 * Math.sin(2 * th) + 6 * Math.sin(3 * th + 1),
     }),
+    // through the temple behind its waterfall, over the river where the bridge washed out, the
+    // corkscrew through the idols' gate
+    features: [
+      { type: 'tunnel', from: [389.3, 192.9], to: [312.5, 280.8], style: 'temple' },
+      { type: 'jump', at: [-367.2, -54.6], gap: 50, ramp: 26, h: 3.6, launch: 11, minSpeed: 60, bridge: 40, sign: 'BRIDGE OUT' },
+      { type: 'corkscrew', from: [243.1, -180.5], to: [329.6, -131.2], radius: 11 },
+    ],
   },
   // CANAL QUARTER: a ring of streets through the old town; humpback bridges where it crosses
   // a canal (design-size coordinates: see CANALS)
