@@ -9,6 +9,8 @@
 //       space: only the drawn car, the camera and the road mesh curl.
 //   { type: 'tunnel', from: [x, z], to: [x, z], style }  a covered stretch (tunnel.js)
 //   { type: 'crossing', at: [x, z] }  a level crossing (the map runs a train over it: train.js)
+//   { type: 'bridge', from: [x, z], to: [x, z] }  the road on a bridge or viaduct the map builds:
+//       no embankment there (nothing for shortcuts to avoid)
 import { Rail } from './rail.js';
 
 const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
@@ -112,7 +114,7 @@ export class Bank {
 }
 
 // A layout's set pieces on its track: { rails, jumps, banks, tunnels ({ a, b, style }),
-// crossings ({ s }), avoid }
+// crossings ({ s }), bridges ({ a, b }), avoid }
 // (avoid: main-road stretches no shortcut may touch)
 export function layoutFeatures(track, layout) {
   const list = layout.features || [];
@@ -124,6 +126,7 @@ export function layoutFeatures(track, layout) {
     return { a, b, style: f.style || 'rock', spec: f };
   });
   const crossings = list.filter((f) => f.type === 'crossing').map((f) => ({ s: track.project(f.at[0], f.at[1]).s, spec: f }));
+  const bridges = list.filter((f) => f.type === 'bridge').map((f) => ({ a: track.project(f.from[0], f.from[1]).s, b: track.project(f.to[0], f.to[1]).s, spec: f }));
   for (const r of rails) r.flattenCurvature();
   for (const b of banks) b.relaxCurvature();
   const avoid = [
@@ -133,7 +136,7 @@ export function layoutFeatures(track, layout) {
     ...tunnels.map((t) => [t.a - 60, t.b + 60]),
     ...crossings.map((c) => [c.s - 70, c.s + 70]),
   ];
-  return { rails, jumps, banks, tunnels, crossings, avoid };
+  return { rails, jumps, banks, tunnels, crossings, bridges, avoid };
 }
 
 // the jump whose ramp or gap is at s (with `margin` metres either side), or null

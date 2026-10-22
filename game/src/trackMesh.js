@@ -56,7 +56,7 @@ function fixWinding(g, wantUp) {
 // asphalt: { map, normalMap, roughnessMap } from getAsphalt()
 // shortcuts: ShortcutSet (or null); set pieces (features.js): the main road isn't drawn under a
 // rail, across a jump's gap or along a wall-ride (that has its own curled road)
-export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = null, { rails = [], jumps = [], banks = [], crossings = [] } = {}) {
+export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = null, { rails = [], jumps = [], banks = [], crossings = [], bridges = [] } = {}) {
   const group = new THREE.Group();
   const hw = track.halfWidth;
   const at_ = (i) => i * track.step;
@@ -113,8 +113,9 @@ export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = nu
     }
   }
 
-  // Embankment down to the terrain (not under a jump's bridge decks)
+  // Embankment down to the terrain (not under a jump's bridge decks or on a bridge)
   const decks = jumps.filter((j) => j.spec.bridge);
+  const onBridge = (i) => bridges.some((b) => track.deltaS(b.a, at_(i)) >= 0 && track.deltaS(at_(i), b.b) >= 0);
   // ...and where a railway crosses the road there is no embankment or barrier either
   const crossing = (i) => crossings.some((c) => Math.abs(track.deltaS(c.s, at_(i))) < hw + 4);
   const barrierKeep = (side) => {
@@ -123,7 +124,7 @@ export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = nu
   };
   const embKeep = (side) => {
     const k = barrierKeep(side);
-    return decks.length ? (i) => (!k || k(i)) && !decks.some((j) => j.near(at_(i), j.spec.bridge)) : k;
+    return decks.length || bridges.length ? (i) => (!k || k(i)) && !decks.some((j) => j.near(at_(i), j.spec.bridge)) && !onBridge(i) : k;
   };
   if (style.embankment) {
     const eMat = addWorldDetail(new THREE.MeshStandardMaterial({ color: style.embankment, roughness: 1 }), { fine: [0.45, 0.45], macro: [0.03, 0.35], rough: 0 });
@@ -649,7 +650,7 @@ function buildRail(rail, style, roadMat) {
 
   const steel = new THREE.MeshStandardMaterial({ color: look.steel ?? 0x3a3a40, roughness: 0.5, metalness: 0.7 });
   const P = {};
-  const ground = track.pointAt(rail.s0, 0).y;
+  const ground = track.pointAt(rail.s0, 0).y, foot = look.foot ?? 1;
   if (rail.kind !== 'helix') {
     // columns from the ground up to the low parts (where the slab faces down)
     const cols = [];
@@ -660,7 +661,7 @@ function buildRail(rail, style, roadMat) {
       if (by - ground < 1.5) continue;
       for (const sd of [-1, 1]) {
         const x = bx + P.bx * sd * (hw - 2), z = bz + P.bz * sd * (hw - 2);
-        cols.push({ x, z, y0: ground - 1, y1: by + P.by * sd * (hw - 2) });
+        cols.push({ x, z, y0: ground - foot, y1: by + P.by * sd * (hw - 2) });
       }
     }
     if (cols.length) {
@@ -718,6 +719,7 @@ function buildRail(rail, style, roadMat) {
       for (const sd of [-1, 1]) {
         const p = track.pointAt(rail.sOf(a === a0 ? lead + 2 : lead + mid - 2), sd * (hw + 3));
         beamBetween({ x: p.x, y: p.y - 1, z: p.z }, a, 1.1);
+        if (foot > 1) beamBetween({ x: p.x, y: p.y - foot, z: p.z }, { x: p.x, y: p.y - 0.5, z: p.z }, 1.6); // down to the valley floor
       }
     }
   }
