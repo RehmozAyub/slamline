@@ -46,7 +46,7 @@ export class Vehicle {
     this.wrecked = false;
     this.onSC = false; // on a shortcut (see shortcut.js constrainOnRoads)
     this.sc = null;
-    this.air = false; this.trick = null; this.trickYaw = 0; this.trickRoll = 0;
+    this.air = false; this.airG = 0; this.trick = null; this.trickYaw = 0; this.trickRoll = 0;
     this.ride = null; this.pose = null; // riding a loop-the-loop (see loop.js)
     this.lastGround = undefined; this.vyGround = 0;
     this.idx = p.idx;

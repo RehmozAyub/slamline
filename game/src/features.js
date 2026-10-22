@@ -1,8 +1,9 @@
 // A track's set pieces (pure logic, no three.js), listed in its layout as `features`:
 //   { type: 'loop' | 'corkscrew' | 'helix', ... }  rails (rail.js)
-//   { type: 'jump', at: [x, z], gap, ramp, h, launch, minSpeed }
+//   { type: 'jump', at: [x, z], gap, ramp, h, launch, minSpeed, lowG }
 //       a kicker ramp up to a lip at `at`, then `gap` metres with no road (a gorge, a cove).
-//       Cars fly it; one that falls short drops in and comes back past the gap.
+//       Cars fly it; one that falls short drops in and comes back past the gap. lowG (0-1):
+//       gravity in the air off this jump, as a share of the usual (a floaty low-gravity jump)
 //   { type: 'bank', from: [x, z], to: [x, z], side, angle }
 //       a wall-ride: across the road toward `side` (+1 right, -1 left) the surface curls up
 //       into a half-pipe, `angle` (radians) steep at the wall. The physics stays flat track
@@ -29,6 +30,7 @@ export class Jump {
     this.launch = spec.launch ?? 11; // vy at take-off (m/s)
     this.minSpeed = spec.minSpeed ?? 58; // the ramp brings anyone slower up to this (m/s)
     this.pit = spec.pit ?? 60; // how far below the road the gap goes (physics)
+    this.gravity = spec.lowG ?? 1; // share of the usual gravity while flying off it
     this.sRamp = track.wrapS(this.sLip - this.ramp);
     this.sLand = track.wrapS(this.sLip + this.gap);
   }
