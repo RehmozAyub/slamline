@@ -362,7 +362,7 @@ test('every car spends the points budget (within 10%), most exactly', () => {
 });
 
 import { findShortcuts, constrainOnRoads, ShortcutSet, SHORTCUT } from '../game/src/shortcut.js';
-import { layoutFeatures } from '../game/src/features.js';
+import { layoutFeatures, gripAt } from '../game/src/features.js';
 import { AIDriver } from '../game/src/ai.js';
 import { signatureAt, hairpinS, SIGNATURES, SIGNATURE_KINDS } from '../game/src/signatures.js';
 import { recordRace, discoverSignature, unlockedPaints, emptyProgress, starsEarned } from '../game/src/progress.js';
@@ -684,4 +684,33 @@ test('graphics AUTO: desktops start high, phones by GPU class', () => {
   assert.equal(autoQuality('Mali-G78 MP14', true), 'low');
   assert.equal(autoQuality('Apple GPU', true), 'medium');
   assert.equal(autoQuality('', true), 'low');
+});
+
+// --- ice (Whiteout Summit's frozen tarn): the same steering slides wider ------------------------
+test('on ice a car grips less: the same flick of steering leaves it sliding sideways longer', () => {
+  const slide = (surface) => {
+    const v = new Vehicle(CARS[0]);
+    v.vx = 0; v.vz = 60; v.heading = 0;
+    v.surface = surface;
+    for (let k = 0; k < 30; k++) v.update(1 / 120, { throttle: 1, brake: 0, steer: 1, handbrake: false, boost: false });
+    let side = 0;
+    for (let k = 0; k < 60; k++) {
+      v.update(1 / 120, { throttle: 1, brake: 0, steer: 0, handbrake: false, boost: false });
+      side += Math.abs(v.vx * Math.cos(v.heading) - v.vz * Math.sin(v.heading)) / 120;
+    }
+    return side;
+  };
+  const road = slide(1), ice = slide(0.45);
+  assert.ok(ice > road * 1.3, `sideways drift on ice ${ice.toFixed(2)} vs road ${road.toFixed(2)}`);
+});
+
+test('the frozen tarn on Whiteout Summit is slippery and only there', () => {
+  const lay = LAYOUTS.snow;
+  const t = new TrackPath(lay.points, { width: lay.width });
+  const { ice } = layoutFeatures(t, lay);
+  assert.equal(ice.length, 1);
+  const mid = (ice[0].a + ice[0].b) / 2;
+  assert.ok(gripAt(ice, t, mid) < 0.6);
+  assert.equal(gripAt(ice, t, t.wrapS(ice[0].b + 50)), 1);
+  assert.equal(gripAt(ice, t, t.wrapS(ice[0].a - 50)), 1);
 });

@@ -56,7 +56,7 @@ function fixWinding(g, wantUp) {
 // asphalt: { map, normalMap, roughnessMap } from getAsphalt()
 // shortcuts: ShortcutSet (or null); set pieces (features.js): the main road isn't drawn under a
 // rail, across a jump's gap or along a wall-ride (that has its own curled road)
-export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = null, { rails = [], jumps = [], banks = [], crossings = [], bridges = [] } = {}) {
+export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = null, { rails = [], jumps = [], banks = [], crossings = [], bridges = [], ice = [] } = {}) {
   const group = new THREE.Group();
   const hw = track.halfWidth;
   const at_ = (i) => i * track.step;
@@ -115,16 +115,17 @@ export function buildTrackMeshes(track, style, maxAniso, asphalt, shortcuts = nu
 
   // Embankment down to the terrain (not under a jump's bridge decks or on a bridge)
   const decks = jumps.filter((j) => j.spec.bridge);
-  const onBridge = (i) => bridges.some((b) => track.deltaS(b.a, at_(i)) >= 0 && track.deltaS(at_(i), b.b) >= 0);
+  const within = (list) => (i) => list.some((b) => track.deltaS(b.a, at_(i)) >= 0 && track.deltaS(at_(i), b.b) >= 0);
+  const onBridge = within(bridges), onIce = within(ice);
   // ...and where a railway crosses the road there is no embankment or barrier either
   const crossing = (i) => crossings.some((c) => Math.abs(track.deltaS(c.s, at_(i))) < hw + 4);
   const barrierKeep = (side) => {
     const k = sideKeep(side);
-    return crossings.length ? (i) => (!k || k(i)) && !crossing(i) : k;
+    return crossings.length || ice.length ? (i) => (!k || k(i)) && !crossing(i) && !onIce(i) : k;
   };
   const embKeep = (side) => {
     const k = barrierKeep(side);
-    return decks.length || bridges.length ? (i) => (!k || k(i)) && !decks.some((j) => j.near(at_(i), j.spec.bridge)) && !onBridge(i) : k;
+    return decks.length || bridges.length ? (i) => (!k || k(i)) && !decks.some((j) => j.near(at_(i), j.spec.bridge)) && !onBridge(i) : k; // (barrierKeep leaves out the ice)
   };
   if (style.embankment) {
     const eMat = addWorldDetail(new THREE.MeshStandardMaterial({ color: style.embankment, roughness: 1 }), { fine: [0.45, 0.45], macro: [0.03, 0.35], rough: 0 });
@@ -843,5 +844,8 @@ function buildBank(b, style, roadMat, shoulderMat) {
       grid(lat - sd * 0.18, lat + sd * 0.18, 1, 0.02, stripMat, { flip: sd > 0 });
     }
   }
+  // chevrons and a gantry before it, like the other set pieces
+  const signSteel = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.5, metalness: 0.7 });
+  group.add(approachSign(track, b.s0 + 4, b.spec.sign === false ? null : b.spec.sign || 'WALL RIDE', style, signSteel));
   return group;
 }

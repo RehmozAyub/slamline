@@ -11,6 +11,8 @@
 //   { type: 'crossing', at: [x, z] }  a level crossing (the map runs a train over it: train.js)
 //   { type: 'bridge', from: [x, z], to: [x, z] }  the road on a bridge or viaduct the map builds:
 //       no embankment there (nothing for shortcuts to avoid)
+//   { type: 'ice', from: [x, z], to: [x, z], grip = 0.45 }  the road across a frozen lake: tyres
+//       grip less (grip times the usual), no guardrails or embankment (the map builds the shore)
 import { Rail } from './rail.js';
 
 const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
@@ -114,7 +116,7 @@ export class Bank {
 }
 
 // A layout's set pieces on its track: { rails, jumps, banks, tunnels ({ a, b, style }),
-// crossings ({ s }), bridges ({ a, b }), avoid }
+// crossings ({ s }), bridges ({ a, b }), ice ({ a, b, grip }), avoid }
 // (avoid: main-road stretches no shortcut may touch)
 export function layoutFeatures(track, layout) {
   const list = layout.features || [];
@@ -127,6 +129,7 @@ export function layoutFeatures(track, layout) {
   });
   const crossings = list.filter((f) => f.type === 'crossing').map((f) => ({ s: track.project(f.at[0], f.at[1]).s, spec: f }));
   const bridges = list.filter((f) => f.type === 'bridge').map((f) => ({ a: track.project(f.from[0], f.from[1]).s, b: track.project(f.to[0], f.to[1]).s, spec: f }));
+  const ice = list.filter((f) => f.type === 'ice').map((f) => ({ a: track.project(f.from[0], f.from[1]).s, b: track.project(f.to[0], f.to[1]).s, grip: f.grip ?? 0.45, spec: f }));
   for (const r of rails) r.flattenCurvature();
   for (const b of banks) b.relaxCurvature();
   const avoid = [
@@ -136,13 +139,19 @@ export function layoutFeatures(track, layout) {
     ...tunnels.map((t) => [t.a - 60, t.b + 60]),
     ...crossings.map((c) => [c.s - 70, c.s + 70]),
   ];
-  return { rails, jumps, banks, tunnels, crossings, bridges, avoid };
+  return { rails, jumps, banks, tunnels, crossings, bridges, ice, avoid };
 }
 
 // the jump whose ramp or gap is at s (with `margin` metres either side), or null
 export function jumpAt(jumps, s, margin = 0) {
   for (const j of jumps) if (j.near(s, margin)) return j;
   return null;
+}
+
+// how well tyres grip the main road at s (1 normally, less on ice)
+export function gripAt(ice, track, s) {
+  for (const p of ice) if (track.deltaS(p.a, s) >= 0 && track.deltaS(s, p.b) >= 0) return p.grip;
+  return 1;
 }
 
 // the bank curling the road at s, or null
