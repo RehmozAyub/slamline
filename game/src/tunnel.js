@@ -2,6 +2,8 @@
 //   lava    - a lava tube: arched rock with glowing veins, lava gutters, warm lamps (Magma Core)
 //   seacave - a sea cave: a wide, rough vault of wet rock, glowing water in the gutters
 //   subway  - a cut-and-cover tunnel: tiled box with strip lights, a concrete roof at street level
+//   temple  - through the base of a stepped jungle temple: a corbel vault of carved blocks whose
+//             glyphs glow, torches, moss on the top terraces
 //   gallery - an avalanche gallery: a concrete roof against the mountain (spec.side: the mountain's
 //             side of the road, default -1), open to the valley between pillars, snow on top
 // Each is a shell along the road: the inside, the outside (a rock hull or a street-level slab)
@@ -17,6 +19,7 @@ export const TUNNEL_STYLES = {
   lava: { profile: 'arch', width: 3, height: 11, hull: 'mountain', hullH: 34, inner: 'veins', glow: 0xff7a2a, glowI: 1.7, gutter: 'lava', lamps: 'warm', rock: [0x1e1816, 0x3a2e2a] },
   seacave: { profile: 'cave', width: 6, height: 13, jitter: 1.6, hull: 'mountain', hullH: 30, inner: 'wetrock', glow: 0x2ae0d0, glowI: 1.4, gutter: 'glowWater', lamps: null, rock: [0x4a3a30, 0x7a6450] },
   subway: { profile: 'box', width: 3.5, height: 7, hull: 'slab', top: 0.3, inner: 'tiles', band: '#d0206a', gutter: null, lamps: 'strip', slab: 0x55565c },
+  temple: { profile: 'corbel', width: 3, height: 12, hull: 'temple', inner: 'glyphs', glow: 0x3dff8a, glowI: 1.6, gutter: null, lamps: 'warm', rock: [0x55574c, 0x707264], grass: 0x3f6a2c },
   gallery: { profile: 'gallery', width: 3, height: 8, hull: 'gallery', inner: 'concrete', gutter: null, lamps: 'warm', slab: 0xa8a49c, roof: 0xf2f5fa, pillars: 7, shade: 0.45 },
 };
 
@@ -75,6 +78,39 @@ const innerTextures = {
     }
     return { map: tex(rock), emissive: tex(glow) };
   },
+  // big carved blocks; the carvings glow
+  glyphs() {
+    const S = 512, wall = canvas(S), glow = canvas(S);
+    const g = wall.getContext('2d'), e = glow.getContext('2d');
+    noiseFill(g, S, [84, 88, 74], 40, 26);
+    e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    const rand = rng(41);
+    g.strokeStyle = 'rgba(20,24,16,0.7)'; g.lineWidth = 3;
+    for (let y = 0; y < S; y += 64) {
+      g.beginPath(); g.moveTo(0, y + 1.5); g.lineTo(S, y + 1.5); g.stroke();
+      const off = (y / 64) % 2 ? 0 : 48;
+      for (let x = off; x < S; x += 96) { g.beginPath(); g.moveTo(x + 1.5, y); g.lineTo(x + 1.5, y + 64); g.stroke(); }
+    }
+    // a glyph in some blocks: rings, bars, eyes, steps
+    for (let by = 0; by < 8; by++) for (let bx = 0; bx < 5; bx++) {
+      if (rand() < 0.45) continue;
+      const cx = bx * 96 + 48 + ((by % 2) ? 0 : 48) - 48, cy = by * 64 + 32;
+      for (const [ctx, col, w] of [[g, 'rgba(30,60,30,0.9)', 4], [e, '#5dffa0', 3]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = w;
+        const kind = Math.floor(rand() * 4);
+        ctx.beginPath();
+        if (kind === 0) { ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.moveTo(cx + 5, cy); ctx.arc(cx, cy, 5, 0, Math.PI * 2); }
+        else if (kind === 1) { for (let k = -1; k <= 1; k++) { ctx.moveTo(cx - 16, cy + k * 9); ctx.lineTo(cx + 16, cy + k * 9); } }
+        else if (kind === 2) { ctx.ellipse(cx, cy, 18, 10, 0, 0, Math.PI * 2); ctx.moveTo(cx + 4, cy); ctx.arc(cx, cy, 4, 0, Math.PI * 2); }
+        else { ctx.moveTo(cx - 16, cy + 14); ctx.lineTo(cx - 16, cy + 4); ctx.lineTo(cx - 5, cy + 4); ctx.lineTo(cx - 5, cy - 6); ctx.lineTo(cx + 6, cy - 6); ctx.lineTo(cx + 6, cy - 14); ctx.lineTo(cx + 16, cy - 14); }
+        ctx.stroke();
+      }
+    }
+    // moss creeping down from the top
+    g.fillStyle = 'rgba(50,90,34,0.35)';
+    for (let k = 0; k < 60; k++) { g.beginPath(); g.ellipse(rand() * S, rand() * S * 0.4, 8 + rand() * 20, 4 + rand() * 30, 0, 0, Math.PI * 2); g.fill(); }
+    return { map: tex(wall), emissive: tex(glow) };
+  },
   // board-marked concrete, streaked by meltwater
   concrete() {
     const S = 512, wall = canvas(S), glow = canvas(S);
@@ -128,8 +164,15 @@ function along(pts, f) {
 const galleryInner = (W, H) => [[-W, -1.2], [-W, H], [W, H]];
 const galleryOuter = (W, H) => [[-W - 2.5, -4], [-W - 2.5, H + 1], [W + 1.6, H + 1], [W + 1.6, H - 1.2]];
 
+// a corbel vault: straight walls, then courses stepping in to a flat capstone
+const corbelInner = (W, H) => [[-W, -1.2], [-W, H * 0.5], [-W * 0.32, H], [W * 0.32, H], [W, H * 0.5], [W, -1.2]];
+// the temple outside: terraces stepping up to a shrine on top, one point per profile sample
+const TEMPLE = [[-58, -4], [-58, 6], [-47, 6], [-47, 14], [-36, 14], [-36, 22], [-25, 22], [-25, 30], [-14, 30], [-14, 36], [-7, 36], [-7, 42]];
+const templeOuter = [...TEMPLE, [0, 42], ...TEMPLE.map(([x, y]) => [-x, y]).reverse()];
+
 function innerAt(st, hw, k) {
   const W = hw + st.width, H = st.height;
+  if (st.profile === 'corbel') return along(corbelInner(W, H), k / N);
   if (st.profile === 'gallery') return along(galleryInner(W, H), k / N);
   if (st.profile === 'box') {
     // up the left wall, across the ceiling, down the right wall (by length)
@@ -143,6 +186,7 @@ function innerAt(st, hw, k) {
 }
 function outerAt(st, hw, k, hTop) {
   if (st.hull === 'gallery') return along(galleryOuter(hw + st.width, st.height), k / N);
+  if (st.hull === 'temple') return templeOuter[k];
   if (st.hull === 'slab') {
     const W = hw + st.width + 3, top = hTop, wall = top + 3, per = 2 * wall + 2 * W, d = (k / N) * per;
     if (d < wall) return [-W, -3 + d];
@@ -181,6 +225,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     const { inner: innerMat, outer: outerMat, gutter: gutterMat } = made[t.style];
     const rockA = new THREE.Color(st.rock ? st.rock[0] : st.slab), rockB = new THREE.Color(st.rock ? st.rock[1] : st.slab), rc = new THREE.Color();
     const grass = st.grass ? new THREE.Color(st.grass) : null;
+    const stepped = st.hull === 'temple';
     const gallery = st.hull === 'gallery', flip = gallery && (t.spec.side ?? -1) > 0 ? -1 : 1;
     const roofCol = gallery ? new THREE.Color(st.roof) : null, slabCol = gallery ? new THREE.Color(st.slab) : null;
     const ia = Math.floor(t.a / track.step), ib = Math.ceil(t.b / track.step);
@@ -193,7 +238,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
       for (let k = 0; k <= N; k++) {
         let [li, hi] = innerAt(st, hw, k);
         li *= flip;
-        if (st.profile !== 'box' && !gallery) {
+        if (st.profile !== 'box' && !gallery && st.profile !== 'corbel') {
           const j = (noise2(i * 0.15, k * 0.9) - 0.5) * (st.jitter ?? 0.6);
           li += j * Math.sign(li); hi += j * 0.6;
         }
@@ -205,7 +250,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
         // a hill can sink toward its ends (swell) and be craggy (crag) instead of smooth
         if (st.swell) ho = -7 + (ho + 7) * (1 - st.swell * (1 - Math.sin((Math.PI * r) / (rows.length - 1))));
         const ox = x + rx * lo, oz = z + rz * lo;
-        const bump = st.hull === 'slab' || gallery ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
+        const bump = st.hull === 'slab' || gallery || stepped ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
         outer.push(ox + rx * bump * 0.3, y + ho + bump, oz + rz * bump * 0.3);
         rc.copy(rockA).lerp(rockB, fbm(ox * 0.02, oz * 0.02, 2));
         if (grass) rc.lerp(grass, Math.min(1, Math.max(0, (Math.sin(Math.PI * (k / N)) - 0.72) / 0.18)) * 0.9); // grass over the top
