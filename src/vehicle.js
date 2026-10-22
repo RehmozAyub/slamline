@@ -24,6 +24,7 @@ export class Vehicle {
     this.bodyPitch = 0; this.bodyRoll = 0;
     this.wheelSpin = 0;
     this.scraping = 0;
+    this.surface = 1; // grip of the road under the tyres (less on ice: features.js)
     this.wrecked = false;
     this.ghost = 0; // seconds of no-collision after respawn
     this.proj = {};
@@ -123,7 +124,7 @@ export class Vehicle {
     if (c.handbrake) { vF -= Math.sign(vF) * Math.min(Math.abs(vF), 5 * dt); this.braking = true; }
 
     // lateral grip
-    const grip = this.drifting ? sp.grip * 0.2 : c.handbrake ? sp.grip * 0.3 : sp.grip;
+    const grip = (this.drifting ? sp.grip * 0.2 : c.handbrake ? sp.grip * 0.3 : sp.grip) * this.surface;
     vR *= Math.exp(-grip * dt);
     // arcade: keep most of the speed through corners instead of scrubbing it
     const keep = this.drifting ? 0.72 : 0.9;

@@ -30,7 +30,7 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const scene = new THREE.Scene();
   const track = new TrackPath(def.layout.points, { width: def.layout.width });
   // set pieces (features.js): rails (loops, corkscrews, helixes), jumps, wall-rides, tunnels
-  const { rails, jumps, banks, tunnels, crossings, bridges, avoid } = layoutFeatures(track, def.layout);
+  const { rails, jumps, banks, tunnels, crossings, bridges, ice, avoid } = layoutFeatures(track, def.layout);
   // (a jump's gap is no road: the terrain there is the map's own, a gorge or a cove)
   const mainIndex = new TrackIndex(track, 40, jumps.length ? (i) => !jumps.some((j) => j.inGap(i * track.step)) : null);
   const shortcuts = new ShortcutSet(track, shortcutsFor(def.id, track, mainIndex, avoid));
@@ -54,14 +54,14 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const hemi = new THREE.HemisphereLight(def.hemi.sky, def.hemi.ground, def.hemi.intensity);
   scene.add(hemi);
 
-  const trackGroup = buildTrackMeshes(track, def.trackStyle, glRenderer.capabilities.getMaxAnisotropy(), asphalt, shortcuts, { rails, jumps, banks, crossings, bridges });
+  const trackGroup = buildTrackMeshes(track, def.trackStyle, glRenderer.capabilities.getMaxAnisotropy(), asphalt, shortcuts, { rails, jumps, banks, crossings, bridges, ice });
   scene.add(trackGroup);
   const tunnelGroup = tunnels.length ? buildTunnels(track, tunnels, def.tunnels || {}) : null;
   if (tunnelGroup) scene.add(tunnelGroup);
 
   const envScene = new THREE.Scene();
   envScene.add(createSky(def.sky, 400));
-  const scenery = def.build({ scene, track, index, density: quality.density, envScene, sunDir, shortcut: shortcuts, rails, jumps, banks, tunnels, crossings, bridges }) || {};
+  const scenery = def.build({ scene, track, index, density: quality.density, envScene, sunDir, shortcut: shortcuts, rails, jumps, banks, tunnels, crossings, bridges, ice }) || {};
   // rock-like scenery (flat-shaded vertex-coloured instances: rocks, mesas, ruins) gets stone grain
   const detailed = new Set();
   scene.traverse((o) => {
@@ -85,7 +85,7 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
 
   const snap = 1;
   const world = {
-    def, scene, track, index, shortcuts, rails, jumps, banks, tunnels, crossings, sky,
+    def, scene, track, index, shortcuts, rails, jumps, banks, tunnels, crossings, ice, sky,
     // trains running over level crossings: [{ train, s (main road), tc (along the line), w }]
     trains: scenery.trains || [], sun, hemi, weather, landmark: scenery.landmark || null,
     flash: 0,

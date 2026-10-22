@@ -165,6 +165,13 @@ const LAYOUTS_BASE = {
       harmonics: [[2, 0.16, 1.0], [3, 0.12, 2.4], [5, 0.05, 0.8], [7, 0.025, 0.2]],
       elevation: (th) => 42 + 18 * Math.sin(th + 2) + 8 * Math.sin(2 * th + 0.4),
     }),
+    // the corkscrew through an ice tube, the frozen-lake crossing (slippery), the bobsleigh
+    // wall-ride after it
+    features: [
+      { type: 'corkscrew', from: [-368.9, 146.3], to: [-412.6, 57.8], radius: 11 },
+      { type: 'ice', from: [-42.8, -297.2], to: [172.9, -258.2], grip: 0.45 },
+      { type: 'bank', from: [214.5, -256.4], to: [340.3, -216.3], side: -1, angle: 1.35, sign: 'BOBSLEIGH', look: { wall: 0xd6eaf6, back: 0xb4cfe4, glow: 0x5ad8ff, glowIntensity: 2.6 } },
+    ],
   },
   canyon: {
     width: 20,

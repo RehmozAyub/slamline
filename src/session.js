@@ -19,7 +19,7 @@ import { DriveAssist, ASSIST_RULES } from './assist.js';
 import { signatureAt, hairpinS } from './signatures.js';
 import { constrainOnRoads } from './shortcut.js';
 import { tryEnterRail, railStep, railContacts } from './rail.js';
-import { jumpAt, bankAt } from './features.js';
+import { jumpAt, bankAt, gripAt } from './features.js';
 import { FenceProps } from './props.js';
 import { RivalMarkers } from './markers.js';
 
@@ -56,6 +56,7 @@ export class RaceSession {
     this.jumps = world.jumps || []; // gaps to fly (features.js)
     this.banks = world.banks || []; // wall-rides (features.js)
     this.trains = world.trains || []; // trains over level crossings: { train, s, tc, w }
+    this.ice = world.ice || []; // frozen stretches of road (features.js)
     this.landmark = world.landmark || null;
     this.hairpin = hairpinS(this.track);
     this.tmpP = {}; this.tmpQ = {};
@@ -329,6 +330,7 @@ export class RaceSession {
         if (c.remote) { if (c.vehicle.wrecked) c.vehicle.updateWreck(h); continue; } // driven on the other device
         const v = c.vehicle, prevU = v.onSC ? v.scU : -1, prevSC = v.sc;
         if (v.ride) { const rail = v.ride.rail, out = railStep(v, c.controls, h, c.mul, !!c.human); if (out === 'done') this.onRailDone(c, rail); continue; }
+        if (this.ice.length) v.surface = v.onSC ? 1 : gripAt(this.ice, this.track, v.s);
         v.update(h, c.controls, c.mul);
         const hit = this.constrainCar(c, h);
         if (hit) this.onWallHit(c, hit);
