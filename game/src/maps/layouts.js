@@ -216,6 +216,13 @@ const LAYOUTS_BASE = {
       (x, z) => canalHump(x, z),
       18,
     ),
+    // the drawbridge left raised over a canal (jump it), the passage under the old weigh house,
+    // the market hall on the long south street
+    features: [
+      { type: 'jump', at: [-274.8, -281.1], gap: 42, ramp: 24, h: 3.4, launch: 10, minSpeed: 56, sign: 'DRAWBRIDGE' },
+      { type: 'tunnel', from: [-116.7, -327.3], to: [-16.8, -322.3], style: 'brick' },
+      { type: 'tunnel', from: [58.1, -318.6], to: [174.6, -312.8], style: 'arcade' },
+    ],
   },
   // NEBULA RING: an orbital speedway floating high above nothing, with big climbs and drops
   space: {

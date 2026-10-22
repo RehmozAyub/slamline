@@ -4,6 +4,8 @@
 //   subway  - a cut-and-cover tunnel: tiled box with strip lights, a concrete roof at street level
 //   temple  - through the base of a stepped jungle temple: a corbel vault of carved blocks whose
 //             glyphs glow, torches, moss on the top terraces
+//   brick   - a brick-vaulted passage under a building (the map dresses the building round it)
+//   arcade  - a market hall: a glass and iron barrel roof on columns, open on both sides
 //   gallery - an avalanche gallery: a concrete roof against the mountain (spec.side: the mountain's
 //             side of the road, default -1), open to the valley between pillars, snow on top
 // Each is a shell along the road: the inside, the outside (a rock hull or a street-level slab)
@@ -20,6 +22,8 @@ export const TUNNEL_STYLES = {
   seacave: { profile: 'cave', width: 6, height: 13, jitter: 1.6, hull: 'mountain', hullH: 30, inner: 'wetrock', glow: 0x2ae0d0, glowI: 1.4, gutter: 'glowWater', lamps: null, rock: [0x4a3a30, 0x7a6450] },
   subway: { profile: 'box', width: 3.5, height: 7, hull: 'slab', top: 0.3, inner: 'tiles', band: '#d0206a', gutter: null, lamps: 'strip', slab: 0x55565c },
   temple: { profile: 'corbel', width: 3, height: 12, hull: 'temple', inner: 'glyphs', glow: 0x3dff8a, glowI: 1.6, gutter: null, lamps: 'warm', rock: [0x55574c, 0x707264], grass: 0x3f6a2c },
+  brick: { profile: 'arch', width: 2.5, height: 9, hull: 'slab', top: 17, inner: 'brick', glow: 0xffb060, glowI: 0.5, gutter: null, lamps: 'warm', slab: 0x6e3226 },
+  arcade: { profile: 'vault', width: 2.5, height: 9.5, hull: 'vault', inner: 'ironglass', glow: 0xfff0d8, glowI: 0.55, gutter: null, lamps: null, slab: 0x2a3230, pillars: 6, open: 'both', shade: 0.3 },
   gallery: { profile: 'gallery', width: 3, height: 8, hull: 'gallery', inner: 'concrete', gutter: null, lamps: 'warm', slab: 0xa8a49c, roof: 0xf2f5fa, pillars: 7, shade: 0.45 },
 };
 
@@ -77,6 +81,37 @@ const innerTextures = {
       }
     }
     return { map: tex(rock), emissive: tex(glow) };
+  },
+  // old red brick with pale mortar and soot
+  brick() {
+    const S = 512, wall = canvas(S), glow = canvas(S);
+    const g = wall.getContext('2d'), e = glow.getContext('2d');
+    g.fillStyle = '#b8ab98'; g.fillRect(0, 0, S, S);
+    const rand = rng(17);
+    for (let y = 0; y < S; y += 16) for (let x = ((y / 16) % 2) * -16; x < S; x += 32) {
+      const r = 110 + rand() * 40, gg = 44 + rand() * 20, b = 32 + rand() * 14;
+      g.fillStyle = `rgb(${r},${gg},${b})`;
+      g.fillRect(x + 1, y + 1, 30, 14);
+    }
+    const soot = g.createLinearGradient(0, 0, 0, S);
+    soot.addColorStop(0, 'rgba(20,16,14,0.45)'); soot.addColorStop(0.5, 'rgba(20,16,14,0)');
+    g.fillStyle = soot; g.fillRect(0, 0, S, S);
+    e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    return { map: tex(wall), emissive: tex(glow) };
+  },
+  // a glass roof between iron ribs; the panes let the daylight through
+  ironglass() {
+    const S = 512, wall = canvas(S), glow = canvas(S);
+    const g = wall.getContext('2d'), e = glow.getContext('2d');
+    g.fillStyle = '#1c2422'; g.fillRect(0, 0, S, S);
+    e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 64) for (let x = 0; x < S; x += 128) {
+      const grd = g.createLinearGradient(x, y, x + 120, y + 60);
+      grd.addColorStop(0, '#d8e8ec'); grd.addColorStop(1, '#a8c0c8');
+      g.fillStyle = grd; g.fillRect(x + 5, y + 4, 118, 56);
+      e.fillStyle = '#c8c0b0'; e.fillRect(x + 5, y + 4, 118, 56);
+    }
+    return { map: tex(wall), emissive: tex(glow) };
   },
   // big carved blocks; the carvings glow
   glyphs() {
@@ -170,8 +205,12 @@ const corbelInner = (W, H) => [[-W, -1.2], [-W, H * 0.5], [-W * 0.32, H], [W * 0
 const TEMPLE = [[-58, -4], [-58, 6], [-47, 6], [-47, 14], [-36, 14], [-36, 22], [-25, 22], [-25, 30], [-14, 30], [-14, 36], [-7, 36], [-7, 42]];
 const templeOuter = [...TEMPLE, [0, 42], ...TEMPLE.map(([x, y]) => [-x, y]).reverse()];
 
+// a barrel vault from eave to eave (the market hall: no walls)
+const vault = (W, H, out = 0) => Array.from({ length: 13 }, (_, i) => { const a = Math.PI * (1 - i / 12); return [(W + out) * Math.cos(a), H - 3.6 + out * 0.5 + (3.6 + out) * Math.sin(a)]; });
+
 function innerAt(st, hw, k) {
   const W = hw + st.width, H = st.height;
+  if (st.profile === 'vault') return along(vault(W, H), k / N);
   if (st.profile === 'corbel') return along(corbelInner(W, H), k / N);
   if (st.profile === 'gallery') return along(galleryInner(W, H), k / N);
   if (st.profile === 'box') {
@@ -187,6 +226,7 @@ function innerAt(st, hw, k) {
 function outerAt(st, hw, k, hTop) {
   if (st.hull === 'gallery') return along(galleryOuter(hw + st.width, st.height), k / N);
   if (st.hull === 'temple') return templeOuter[k];
+  if (st.hull === 'vault') return along(vault(hw + st.width, st.height, 0.6), k / N);
   if (st.hull === 'slab') {
     const W = hw + st.width + 3, top = hTop, wall = top + 3, per = 2 * wall + 2 * W, d = (k / N) * per;
     if (d < wall) return [-W, -3 + d];
@@ -225,9 +265,9 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     const { inner: innerMat, outer: outerMat, gutter: gutterMat } = made[t.style];
     const rockA = new THREE.Color(st.rock ? st.rock[0] : st.slab), rockB = new THREE.Color(st.rock ? st.rock[1] : st.slab), rc = new THREE.Color();
     const grass = st.grass ? new THREE.Color(st.grass) : null;
-    const stepped = st.hull === 'temple';
+    const stepped = st.hull === 'temple', hall = st.hull === 'vault';
     const gallery = st.hull === 'gallery', flip = gallery && (t.spec.side ?? -1) > 0 ? -1 : 1;
-    const roofCol = gallery ? new THREE.Color(st.roof) : null, slabCol = gallery ? new THREE.Color(st.slab) : null;
+    const roofCol = gallery ? new THREE.Color(st.roof) : null, slabCol = gallery || hall ? new THREE.Color(st.slab) : null;
     const ia = Math.floor(t.a / track.step), ib = Math.ceil(t.b / track.step);
     const rows = [];
     for (let i = ia; i <= ib; i += 2) rows.push(((i % track.n) + track.n) % track.n);
@@ -238,7 +278,7 @@ export function buildTunnels(track, tunnels, overrides = {}) {
       for (let k = 0; k <= N; k++) {
         let [li, hi] = innerAt(st, hw, k);
         li *= flip;
-        if (st.profile !== 'box' && !gallery && st.profile !== 'corbel') {
+        if (st.profile !== 'box' && !gallery && !hall && st.profile !== 'corbel') {
           const j = (noise2(i * 0.15, k * 0.9) - 0.5) * (st.jitter ?? 0.6);
           li += j * Math.sign(li); hi += j * 0.6;
         }
@@ -250,11 +290,12 @@ export function buildTunnels(track, tunnels, overrides = {}) {
         // a hill can sink toward its ends (swell) and be craggy (crag) instead of smooth
         if (st.swell) ho = -7 + (ho + 7) * (1 - st.swell * (1 - Math.sin((Math.PI * r) / (rows.length - 1))));
         const ox = x + rx * lo, oz = z + rz * lo;
-        const bump = st.hull === 'slab' || gallery || stepped ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
+        const bump = st.hull === 'slab' || gallery || stepped || hall ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
         outer.push(ox + rx * bump * 0.3, y + ho + bump, oz + rz * bump * 0.3);
         rc.copy(rockA).lerp(rockB, fbm(ox * 0.02, oz * 0.02, 2));
         if (grass) rc.lerp(grass, Math.min(1, Math.max(0, (Math.sin(Math.PI * (k / N)) - 0.72) / 0.18)) * 0.9); // grass over the top
         if (gallery) rc.copy(ho > st.height + 0.9 ? roofCol : slabCol); // snow lies on the roof
+        if (hall) rc.copy(slabCol);
         outCol.push(rc.r, rc.g, rc.b);
       }
       if (st.lamps === 'warm' && r % 6 === 3) lamps.push({ x, y: y + st.height - 0.6, z, ry: Math.atan2(track.tx[i], track.tz[i]) });
@@ -277,15 +318,20 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     const tout = new THREE.Mesh(strip(outer, [['color', outCol, 3]]), outerMat);
     tout.castShadow = true; tout.receiveShadow = true;
     group.add(tin, tout);
-    if (gallery) {
-      // the roof's underside out to the overhang, and pillars along the open side
+    if (gallery || hall) {
+      // the roof's underside out to the overhang (both eaves on a hall), and pillars along the
+      // open side (both sides of a hall: slim iron columns)
       const pos = [], col = [], idx = [];
-      rows.forEach((i, r) => {
-        const a = (r * (N + 1) + N) * 3;
-        pos.push(inner[a], inner[a + 1], inner[a + 2], outer[a], outer[a + 1], outer[a + 2]);
-        col.push(slabCol.r, slabCol.g, slabCol.b, slabCol.r, slabCol.g, slabCol.b);
-        if (r < rows.length - 1) { const p = r * 2; idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3); }
-      });
+      let n = 0;
+      for (const kk of hall ? [0, N] : [N]) {
+        rows.forEach((i, r) => {
+          const a = (r * (N + 1) + kk) * 3;
+          pos.push(inner[a], inner[a + 1], inner[a + 2], outer[a], outer[a + 1], outer[a + 2]);
+          col.push(slabCol.r, slabCol.g, slabCol.b, slabCol.r, slabCol.g, slabCol.b);
+          if (r < rows.length - 1) { const p = n + r * 2; idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3); }
+        });
+        n += rows.length * 2;
+      }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -293,12 +339,15 @@ export function buildTunnels(track, tunnels, overrides = {}) {
       g.computeVertexNormals();
       group.add(new THREE.Mesh(g, outerMat));
       const posts = [], P = {}, W = hw + st.width;
+      const postH = hall ? st.height - 3.6 : st.height;
       for (let s = t.a + 3; s < t.b - 2; s += st.pillars) {
-        track.pointAt(s, flip * (W + 0.4), P);
-        posts.push({ x: P.x, y: P.y - 0.6, z: P.z, ry: P.heading });
+        for (const sd of hall ? [-1, 1] : [flip]) {
+          track.pointAt(s, sd * (W + 0.4), P);
+          posts.push({ x: P.x, y: P.y - 0.6, z: P.z, ry: P.heading });
+        }
       }
-      const post = new THREE.BoxGeometry(1.1, st.height + 0.7, 1.6).translate(0, (st.height + 0.7) / 2, 0);
-      group.add(instanced(post, new THREE.MeshStandardMaterial({ color: st.slab, roughness: 0.9 }), posts));
+      const post = hall ? new THREE.CylinderGeometry(0.28, 0.36, postH + 0.7, 8).translate(0, (postH + 0.7) / 2, 0) : new THREE.BoxGeometry(1.1, postH + 0.7, 1.6).translate(0, (postH + 0.7) / 2, 0);
+      group.add(instanced(post, new THREE.MeshStandardMaterial({ color: st.slab, roughness: hall ? 0.5 : 0.9, metalness: hall ? 0.5 : 0 }), posts));
     }
     // portal faces: the ring between the inside and the outside at both ends
     for (const r of [0, rows.length - 1]) {
