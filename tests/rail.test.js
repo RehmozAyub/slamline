@@ -101,3 +101,38 @@ test('cars on the rail do not pass through each other', () => {
   assert.ok(b.ride.u - a.ride.u >= RAIL.carLen - 1e-6, 'pushed apart along the rail');
   assert.ok(a.ride.vF <= b.ride.vF, 'the one behind is slowed');
 });
+
+// --- the corkscrew (Sunset Coast): a full roll round the road's own line -------------------------
+const coast = LAYOUTS.coast;
+const coastTrack = new TrackPath(coast.points, { width: coast.width });
+const screw = new Rail(coastTrack, coast.features.find((f) => f.type === 'corkscrew'));
+screw.flattenCurvature();
+
+test('the corkscrew joins the road exactly and is upside down halfway, up over the road', () => {
+  for (const [u, s] of [[0, screw.sA], [screw.length, screw.sB]]) {
+    const a = screw.pose(u, 3), b = coastTrack.pointAt(s, 3);
+    assert.ok(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 0.05, `seam at u=${u}`);
+  }
+  const top = screw.pose(RAIL.lead + screw.midArc / 2, 0);
+  const under = coastTrack.pointAt(screw.sOf(RAIL.lead + screw.midArc / 2), 0);
+  assert.ok(top.uy < -0.99, `upside down halfway (up.y ${top.uy})`);
+  assert.ok(Math.abs(top.y - under.y - 2 * screw.radius) < 0.5 && Math.hypot(top.x - under.x, top.z - under.z) < 0.5, 'straight above the road');
+});
+
+test('a car drives through the corkscrew and out in its lane at speed', () => {
+  const v = new Vehicle(CARS[1]);
+  v.placeOnTrack(coastTrack, screw.sA - 50, -4, 65);
+  let exit = null, minUy = 1, lane = null;
+  const dt = 1 / 120;
+  for (let t = 0; t < 8 && !exit; t += dt) {
+    if (v.ride) { const out = railStep(v, gas, dt); if (v.pose) minUy = Math.min(minUy, v.pose.uy); if (out) exit = { out, s: v.s, lat: v.lateral, speed: v.speed }; continue; }
+    v.update(dt, gas);
+    v.constrain(coastTrack);
+    tryEnterRail(v, [screw], coastTrack);
+    if (v.ride) lane = v.ride.lat;
+  }
+  assert.equal(exit && exit.out, 'done');
+  assert.ok(minUy < -0.95, `went upside down (${minUy})`);
+  assert.ok(Math.abs(exit.lat - lane) < 0.3, `kept its lane (in at ${lane}, out at ${exit.lat})`);
+  assert.ok(exit.speed > 50, `kept its speed (${exit.speed})`);
+});

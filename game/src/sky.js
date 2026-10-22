@@ -1,4 +1,4 @@
-// Procedural sky dome: gradient, HDR sun disc + glow, optional stars and clouds.
+// Procedural sky dome: gradient, HDR sun disc + glow, optional stars, clouds and sun shafts.
 import * as THREE from 'three';
 
 export function skyMaterial(o) {
@@ -19,6 +19,7 @@ export function skyMaterial(o) {
       uClouds: { value: o.clouds ?? 0 },
       uCloudColor: { value: new THREE.Color(o.cloudColor ?? 0xffffff) },
       uHorizonSharp: { value: o.horizonSharp ?? 0.45 },
+      uRays: { value: o.rays ?? 0 },
       uTime: { value: 0 },
       uFlash: { value: 0 },
     },
@@ -32,7 +33,7 @@ export function skyMaterial(o) {
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uTop, uHorizon, uBottom, uSunDir, uSunColor, uCloudColor;
-      uniform float uSunSize, uSunIntensity, uGlow, uStars, uClouds, uHorizonSharp, uTime, uFlash;
+      uniform float uSunSize, uSunIntensity, uGlow, uStars, uClouds, uHorizonSharp, uTime, uFlash, uRays;
       varying vec3 vDir;
       float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
       float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -61,6 +62,14 @@ export function skyMaterial(o) {
           float c = smoothstep(0.48, 0.8, fbm(uv));
           vec3 cc = uCloudColor * (0.85 + 0.35 * pow(max(sd, 0.0), 4.0));
           col = mix(col, cc, c * uClouds * smoothstep(0.0, 0.18, h));
+        }
+        if (uRays > 0.0) {
+          // shafts of light fanning out from a low sun: streaks by angle round it, drifting slowly
+          vec3 sx = normalize(cross(uSunDir, vec3(0.0, 1.0, 0.0))), sy = cross(sx, uSunDir);
+          vec2 q = normalize(vec2(dot(d, sx), dot(d, sy)) + 1e-5);
+          float streak = noise(q * 7.0 + uTime * 0.02) * 0.65 + noise(q * 19.0 - uTime * 0.03) * 0.35;
+          float shaft = smoothstep(0.42, 0.85, streak) * pow(max(sd, 0.0), 9.0) * smoothstep(-0.02, 0.12, h);
+          col += uSunColor * shaft * uRays;
         }
         col += vec3(0.55, 0.6, 0.75) * uFlash * (0.4 + 0.6 * smoothstep(-0.1, 0.4, h));
         gl_FragColor = vec4(col, 1.0);

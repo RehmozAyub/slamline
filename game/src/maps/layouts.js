@@ -110,6 +110,13 @@ const LAYOUTS_BASE = {
       harmonics: [[2, 0.14, 0.4], [3, 0.1, 1.9], [4, 0.05, 2.6], [5, 0.05, 0.2], [7, 0.025, 1.3]],
       elevation: (th) => 14 + 9 * Math.sin(2 * th + 1.2) + 5 * Math.sin(3 * th + 0.3),
     }),
+    // the cliff jump over a cove, the sea cave where the road meets the shore, the corkscrew
+    // through a sea arch out on the headland
+    features: [
+      { type: 'jump', at: [474.8, 196.8], gap: 50, ramp: 26, h: 3.6, launch: 11, minSpeed: 60, sign: 'CLIFF JUMP' },
+      { type: 'tunnel', from: [311.2, -235.4], to: [404.6, -180.9], style: 'seacave' },
+      { type: 'corkscrew', from: [468.3, -141.5], to: [548.8, -82.5], radius: 11 },
+    ],
   },
   city: {
     width: 20,
