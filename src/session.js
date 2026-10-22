@@ -57,6 +57,7 @@ export class RaceSession {
     this.banks = world.banks || []; // wall-rides (features.js)
     this.trains = world.trains || []; // trains over level crossings: { train, s, tc, w }
     this.ice = world.ice || []; // frozen stretches of road (features.js)
+    this.blasts = world.blasts || []; // jet blast behind a jet taking off (Skyport): { active, x, y, z, dx, dz }
     this.landmark = world.landmark || null;
     this.hairpin = hairpinS(this.track);
     this.tmpP = {}; this.tmpQ = {};
@@ -284,6 +285,14 @@ export class RaceSession {
           if (isDrafting({ fwd: r.fwd, lat: r.lat, speed: pv.speed })) drafting = true;
         }
       }
+      // riding in a jet's blast counts as drafting, with a shove and a bonus the first time
+      if (this.blasts.length && racing && !pv.wrecked && this.inBlast(pv)) {
+        drafting = true;
+        const b = this.inBlast(pv), push = 5 * dt;
+        pv.vx += b.dx * push; pv.vz += b.dz * push;
+        if (!H.blastScored && this.state === 'racing') { H.blastScored = true; this.scoreEvent(H, 'JET BLAST', H.boost.event(RULES.nearMissGain * 2)); }
+        H.blastCool = 4;
+      } else if (H.blastCool > 0 && (H.blastCool -= dt) <= 0) H.blastScored = false;
       H.drafting = drafting;
       const events = H.boost.update(dt, {
         drifting: racing && pv.drifting && pv.speed > 15,
@@ -477,6 +486,18 @@ export class RaceSession {
     if (!H || !name || this.state !== 'racing') return;
     this.scoreEvent(H, name, H.boost.event(RULES.nearMissGain * 1.6));
     this.game.audio.whoosh(false, 0.35);
+  }
+
+  // the jet blast (if any) the car is in: behind a jet on its take-off run, the cone of hot air
+  // spreading as it goes
+  inBlast(v) {
+    for (const b of this.blasts) {
+      if (!b.active) continue;
+      const rx = v.x - b.x, rz = v.z - b.z;
+      const along = -(rx * b.dx + rz * b.dz), lat = Math.abs(rx * b.dz - rz * b.dx);
+      if (along > 20 && along < 190 && lat < 16 + along * 0.4 && v.y < b.y + 22) return b;
+    }
+    return null;
   }
 
   // Drawn poses on the wall-rides: a car on a curl leans with it (v.pose, like on a rail).
