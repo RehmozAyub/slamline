@@ -250,6 +250,11 @@ const LAYOUTS_BASE = {
       [120, 105, 110, 95, 70, 80, 90, 70, 110],
       () => 0.6,
     ),
+    // out of the maintenance hangar onto the runway, and off its far end over the cargo dock
+    features: [
+      { type: 'tunnel', from: [-515.9, -240.1], to: [-424.3, -240], style: 'hangar' },
+      { type: 'jump', at: [517.4, -240], gap: 46, ramp: 24, h: 3.4, launch: 10, minSpeed: 58, sign: 'CARGO DOCK' },
+    ],
   },
   // MAGMA CORE: round the lava lake; dense points on the straights keep the loop's jog crisp
   volcano: {

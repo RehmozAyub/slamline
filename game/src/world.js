@@ -87,7 +87,7 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const world = {
     def, scene, track, index, shortcuts, rails, jumps, banks, tunnels, crossings, ice, sky,
     // trains running over level crossings: [{ train, s (main road), tc (along the line), w }]
-    trains: scenery.trains || [], sun, hemi, weather, landmark: scenery.landmark || null,
+    trains: scenery.trains || [], blasts: scenery.blasts || [], sun, hemi, weather, landmark: scenery.landmark || null,
     flash: 0,
     // split screen: a second weather box that only player 2's camera sees
     setViewCount(n) {

@@ -4,6 +4,7 @@
 //   subway  - a cut-and-cover tunnel: tiled box with strip lights, a concrete roof at street level
 //   temple  - through the base of a stepped jungle temple: a corbel vault of carved blocks whose
 //             glyphs glow, torches, moss on the top terraces
+//   hangar  - straight through an aircraft hangar: a tall box of ribbed metal under strip lights
 //   wormhole - a tube of swirling light hanging in space (no hull: the swirl shows outside too)
 //   brick   - a brick-vaulted passage under a building (the map dresses the building round it)
 //   arcade  - a market hall: a glass and iron barrel roof on columns, open on both sides
@@ -23,6 +24,7 @@ export const TUNNEL_STYLES = {
   seacave: { profile: 'cave', width: 6, height: 13, jitter: 1.6, hull: 'mountain', hullH: 30, inner: 'wetrock', glow: 0x2ae0d0, glowI: 1.4, gutter: 'glowWater', lamps: null, rock: [0x4a3a30, 0x7a6450] },
   subway: { profile: 'box', width: 3.5, height: 7, hull: 'slab', top: 0.3, inner: 'tiles', band: '#d0206a', gutter: null, lamps: 'strip', slab: 0x55565c },
   temple: { profile: 'corbel', width: 3, height: 12, hull: 'temple', inner: 'glyphs', glow: 0x3dff8a, glowI: 1.6, gutter: null, lamps: 'warm', rock: [0x55574c, 0x707264], grass: 0x3f6a2c },
+  hangar: { profile: 'box', width: 24, height: 17, hull: 'slab', top: 21.5, inner: 'panels', glow: 0xffffff, glowI: 0.25, gutter: null, lamps: 'strip', slab: 0xa8aeb6, shade: 0.7 },
   wormhole: { profile: 'arch', width: 4, height: 14, jitter: 0, hull: 'none', inner: 'wormhole', gutter: null, lamps: null, shade: 0.85 },
   brick: { profile: 'arch', width: 2.5, height: 9, hull: 'slab', top: 17, inner: 'brick', glow: 0xffb060, glowI: 0.5, gutter: null, lamps: 'warm', slab: 0x6e3226 },
   arcade: { profile: 'vault', width: 2.5, height: 9.5, hull: 'vault', inner: 'ironglass', glow: 0xfff0d8, glowI: 0.55, gutter: null, lamps: null, slab: 0x2a3230, pillars: 6, open: 'both', shade: 0.3 },
@@ -83,6 +85,16 @@ const innerTextures = {
       }
     }
     return { map: tex(rock), emissive: tex(glow) };
+  },
+  // ribbed metal cladding, a painted dado and a yellow safety line
+  panels() {
+    const S = 512, wall = canvas(S), glow = canvas(S);
+    const g = wall.getContext('2d'), e = glow.getContext('2d');
+    for (let x = 0; x < S; x += 16) { const l = 170 + (x / 16) % 2 * 18; g.fillStyle = `rgb(${l},${l + 4},${l + 10})`; g.fillRect(x, 0, 16, S); }
+    g.fillStyle = '#4a5260'; g.fillRect(0, S * 0.82, S, S * 0.18);
+    g.fillStyle = '#f0c020'; g.fillRect(0, S * 0.8, S, 8);
+    e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    return { map: tex(wall), emissive: tex(glow) };
   },
   // old red brick with pale mortar and soot
   brick() {
