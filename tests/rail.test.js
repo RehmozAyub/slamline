@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TrackPath } from '../game/src/trackMath.js';
 import { LAYOUTS } from '../game/src/maps/layouts.js';
-import { LoopRail, LOOP, tryEnterLoop, loopStep, loopContacts } from '../game/src/loop.js';
+import { Rail, RAIL, tryEnterRail, railStep, railContacts } from '../game/src/rail.js';
 import { Vehicle } from '../game/src/vehicle.js';
 import { CARS } from '../game/src/config.js';
 
 const lay = LAYOUTS.volcano;
 const track = new TrackPath(lay.points, { width: lay.width });
-const rail = new LoopRail(track, lay.loops[0]);
+const rail = new Rail(track, lay.features.find((f) => f.type === 'loop'));
 rail.flattenCurvature();
 const gas = { steer: 0, throttle: 1, brake: 0, boost: false };
 
@@ -16,10 +16,10 @@ const gas = { steer: 0, throttle: 1, brake: 0, boost: false };
 function drive(v, c, seconds, onExit = () => {}) {
   const dt = 1 / 120;
   for (let t = 0; t < seconds; t += dt) {
-    if (v.loop) { const out = loopStep(v, c, dt); if (out) onExit(out, v); continue; }
+    if (v.ride) { const out = railStep(v, c, dt); if (out) onExit(out, v); continue; }
     v.update(dt, c);
     v.constrain(track);
-    tryEnterLoop(v, [rail], track);
+    tryEnterRail(v, [rail], track);
   }
 }
 
@@ -28,7 +28,7 @@ test('the loop joins the main road exactly and goes upside down', () => {
     const a = rail.pose(u, 3), b = track.pointAt(s, 3);
     assert.ok(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 0.05, `seam at u=${u}`);
   }
-  const top = rail.pose(LOOP.lead + rail.loopArc / 2, 0);
+  const top = rail.pose(RAIL.lead + rail.midArc / 2, 0);
   assert.ok(top.uy < -0.99, `upside down at the top (up.y ${top.uy})`);
   assert.ok(top.y - track.pointAt(rail.s0).y > 35, `tall (${top.y})`);
   assert.ok(Math.abs(rail.exitTurn) < 0.01, 'entry and exit run the same way');
@@ -68,12 +68,12 @@ test('a car drives into the loop, round it and out the far end in its lane', () 
   assert.ok(Math.abs(exit.lat - 4) < 0.5, `kept its lane (${exit.lat})`);
   assert.ok(exit.speed > 40, `kept its speed (${exit.speed})`);
   // and it is back to normal road driving afterwards
-  assert.equal(v.loop, null);
-  assert.equal(v.loopPose, null);
+  assert.equal(v.ride, null);
+  assert.equal(v.pose, null);
   v.placeOnTrack(track, rail.sA - 20, 0, 50);
   drive(v, gas, 1.4);
-  rode = !!v.loop;
-  if (v.loopPose) maxY = v.loopPose.y;
+  rode = !!v.ride;
+  if (v.pose) maxY = v.pose.y;
   assert.ok(rode && maxY > track.pointAt(rail.s0).y + 2, `climbing the loop again next lap (${maxY})`);
 });
 
@@ -90,14 +90,14 @@ test('a slow car is carried round, a reversing car rolls back out', () => {
   let outB = null;
   drive(back, { steer: 0, throttle: 0, brake: 0, boost: false }, 20, (o) => { outB = outB || o; });
   assert.ok(outB === 'done' || outB === 'back', `rolled out (${outB})`);
-  assert.equal(back.loop, null, 'not stuck on the rail');
+  assert.equal(back.ride, null, 'not stuck on the rail');
 });
 
 test('cars on the rail do not pass through each other', () => {
   const a = new Vehicle(CARS[0]), b = new Vehicle(CARS[1]);
-  for (const v of [a, b]) { v.placeOnTrack(track, rail.sA + 2, 0, 50); tryEnterLoop(v, [rail], track); }
-  a.loop.u = 40; b.loop.u = 41; a.loop.vF = 60; b.loop.vF = 40;
-  loopContacts([a, b]);
-  assert.ok(b.loop.u - a.loop.u >= LOOP.carLen - 1e-6, 'pushed apart along the rail');
-  assert.ok(a.loop.vF <= b.loop.vF, 'the one behind is slowed');
+  for (const v of [a, b]) { v.placeOnTrack(track, rail.sA + 2, 0, 50); tryEnterRail(v, [rail], track); }
+  a.ride.u = 40; b.ride.u = 41; a.ride.vF = 60; b.ride.vF = 40;
+  railContacts([a, b]);
+  assert.ok(b.ride.u - a.ride.u >= RAIL.carLen - 1e-6, 'pushed apart along the rail');
+  assert.ok(a.ride.vF <= b.ride.vF, 'the one behind is slowed');
 });

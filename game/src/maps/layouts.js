@@ -139,6 +139,12 @@ const LAYOUTS_BASE = {
       (x, z) => 10 + 7 * Math.sin(x * 0.004) + 5 * Math.cos(z * 0.005),
       50,
     ),
+    // the broken bridge over the river gorge, the slot-canyon wall-ride, the ore line's crossing
+    features: [
+      { type: 'jump', at: [-186.4, -271.9], gap: 52, ramp: 26, h: 3.6, launch: 11, minSpeed: 60, bridge: 55, sign: 'BRIDGE OUT' },
+      { type: 'bank', from: [561.6, -147.9], to: [626.5, -21.8], side: -1, angle: 1.35, look: { wall: 0xa85a36, back: 0x8a4a2c, glow: 0xffb050, strips: false } },
+      { type: 'crossing', at: [329.9, 211.8] },
+    ],
   },
   jungle: {
     width: 18,
@@ -194,17 +200,20 @@ const LAYOUTS_BASE = {
       volcanoY,
       10,
     ),
-    loops: [{ from: [JOG.x, JOG.z], to: [jogTo.x, jogTo.z] }],
-    tunnels: VOLCANO.tunnels,
+    features: [
+      { type: 'loop', from: [JOG.x, JOG.z], to: [jogTo.x, jogTo.z] },
+      ...VOLCANO.tunnels.map(([from, to]) => ({ type: 'tunnel', from, to, style: 'lava' })),
+    ],
   },
 };
 
 const scaleXZ = ([x, z]) => [x * LAYOUT_SCALE, z * LAYOUT_SCALE];
+// a set piece's positions (from / to / at) scaled like the points
+const scaleFeature = (f) => { const g = { ...f }; for (const k of ['from', 'to', 'at']) if (f[k]) g[k] = scaleXZ(f[k]); return g; };
 export const LAYOUTS = Object.fromEntries(Object.entries(LAYOUTS_BASE).map(([id, l]) => [
   id, {
     ...l,
     points: l.points.map(([x, y, z]) => [x * LAYOUT_SCALE, y, z * LAYOUT_SCALE]),
-    ...(l.loops ? { loops: l.loops.map((lp) => ({ from: scaleXZ(lp.from), to: scaleXZ(lp.to) })) } : {}),
-    ...(l.tunnels ? { tunnels: l.tunnels.map(([a, b]) => [scaleXZ(a), scaleXZ(b)]) } : {}),
+    ...(l.features ? { features: l.features.map(scaleFeature) } : {}),
   },
 ]));

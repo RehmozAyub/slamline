@@ -90,7 +90,8 @@ export class AIDriver {
     // fastest speed at which the car's yaw rate (turn * (1 - 0.5 v/top)) can follow this curve
     const k = 0.74 * this.skill, turn = v.spec.turn, top = v.spec.topSpeed;
     const vCurve = (k * turn) / (curv + (0.5 * k * turn) / top);
-    const target = Math.min(v.spec.topSpeed * this.mul * 1.02, vCurve);
+    // speedCap: set by the race when something blocks the road ahead (a train at a crossing)
+    const target = Math.min(v.spec.topSpeed * this.mul * 1.02, vCurve, this.speedCap ?? Infinity);
     let throttle = speed < target ? 1 : 0;
     let brake = speed > target + 3 ? Math.min(1, (speed - target) / 8) : 0;
 
@@ -101,7 +102,7 @@ export class AIDriver {
     if (this.boosting) {
       this.boostFuel -= dt * 24;
       if (this.boostFuel <= 0 || curv > 0.006) this.boosting = false;
-    } else if (this.boostCooldown < 0 && this.boostFuel > 50 && curv < 0.003 && speed > 30) {
+    } else if (this.boostCooldown < 0 && this.boostFuel > 50 && curv < 0.003 && speed > 30 && !(this.speedCap < speed + 10)) {
       this.boosting = true;
       this.boostCooldown = 6 + Math.random() * 6;
     }

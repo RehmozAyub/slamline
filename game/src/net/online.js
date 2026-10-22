@@ -193,13 +193,13 @@ export class Online {
     v.onSC = !!onSC; v.sc = onSC || null; v.scU = st.scU; v.scLat = onSC ? st.lateral : undefined;
     v.air = !!(st.flags & FLAG.air);
     // going round a loop: scU is the distance along the rail, scIdx which loop
-    const rail = st.flags & FLAG.loop ? S.loops[st.scIdx] : null;
+    const rail = st.flags & FLAG.ride ? S.rails[st.scIdx] : null;
     if (rail) {
       const vF = st.vx * Math.sin(st.heading) + st.vz * Math.cos(st.heading);
       const u = Math.max(0, Math.min(rail.length, st.scU + vF * ahead));
-      v.loop = { rail, u, lat: st.lateral, vF, t: 0 };
-      v.loopPose = rail.pose(u, st.lateral, v.loopPose || {});
-    } else { v.loop = null; v.loopPose = null; }
+      v.ride = { rail, u, lat: st.lateral, vF, t: 0 };
+      v.pose = rail.pose(u, st.lateral, v.pose || {});
+    } else { v.ride = null; v.pose = null; }
     v.ghost = st.flags & FLAG.ghost ? 0.3 : 0;
     v.boosting = !!(st.flags & FLAG.boosting);
     v.braking = !!(st.flags & FLAG.braking);
@@ -226,7 +226,7 @@ export class Online {
       for (const c of S.cars) {
         if (c.remote) continue;
         const v = c.vehicle;
-        list.push(carState(c.index, v, v.onSC ? scs.indexOf(v.sc) : v.loop ? S.loops.indexOf(v.loop.rail) : -1, v.boosting));
+        list.push(carState(c.index, v, v.onSC ? scs.indexOf(v.sc) : v.ride ? S.rails.indexOf(v.ride.rail) : -1, v.boosting));
       }
       const buf = packStates(now, list);
       for (const e of this.links.values()) e.link.sendState(buf);

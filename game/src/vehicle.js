@@ -46,7 +46,7 @@ export class Vehicle {
     this.onSC = false; // on a shortcut (see shortcut.js constrainOnRoads)
     this.sc = null;
     this.air = false; this.trick = null; this.trickYaw = 0; this.trickRoll = 0;
-    this.loop = null; this.loopPose = null; // riding a loop-the-loop (see loop.js)
+    this.ride = null; this.pose = null; // riding a loop-the-loop (see loop.js)
     this.lastGround = undefined; this.vyGround = 0;
     this.idx = p.idx;
     this.bodyPitch = this.bodyRoll = 0;
@@ -152,7 +152,8 @@ export class Vehicle {
 
   // Keep inside the barriers. Returns impact info when the car hits a wall this step.
   // freeSide (-1 / +1): no barrier on that side here (a shortcut fork), so no wall either.
-  constrain(track, freeSide = 0) {
+  // softSide (-1 / +1): the wall on that side is the lip of a wall-ride: brushing it costs little.
+  constrain(track, freeSide = 0, softSide = 0) {
     const p = track.project(this.x, this.z, this.idx, this.proj);
     this.idx = p.idx; this.s = p.s; this.lateral = p.lateral; this.grade = p.grade;
     const th = Math.atan2(p.tx, p.tz);
@@ -181,12 +182,13 @@ export class Vehicle {
     const speed = Math.hypot(this.vx, this.vz);
     const angle = Math.asin(Math.min(1, vn / Math.max(speed, 1e-3))) * 180 / Math.PI;
     // bounce off, always with a little push away so the car doesn't cling to the rail
-    const out = Math.max(vn * 1.3, vn + 1.5);
+    const soft = softSide && side === softSide;
+    const out = soft ? vn + 0.5 : Math.max(vn * 1.3, vn + 1.5);
     this.vx += nx * out;
     this.vz += nz * out;
     // speed lost once per impact; rubbing along the rail costs very little
     // heavier cars (more STRENGTH) plough through with less speed lost
-    const fr = (fresh ? Math.min(0.45, vn * 0.022) : Math.min(0.01, vn * 0.002)) / this.mass;
+    const fr = ((fresh ? Math.min(0.45, vn * 0.022) : Math.min(0.01, vn * 0.002)) / this.mass) * (soft ? 0.12 : 1);
     this.vx *= 1 - fr; this.vz *= 1 - fr;
     if (!this.wrecked) {
       // glance off: turn to run alongside the wall, angled slightly away from it

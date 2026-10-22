@@ -362,7 +362,7 @@ test('every car spends the points budget (within 10%), most exactly', () => {
 });
 
 import { findShortcuts, constrainOnRoads, ShortcutSet, SHORTCUT } from '../game/src/shortcut.js';
-import { layoutFeatures } from '../game/src/loop.js';
+import { layoutFeatures } from '../game/src/features.js';
 import { AIDriver } from '../game/src/ai.js';
 import { signatureAt, hairpinS, SIGNATURES, SIGNATURE_KINDS } from '../game/src/signatures.js';
 import { recordRace, discoverSignature, unlockedPaints, emptyProgress, starsEarned } from '../game/src/progress.js';
