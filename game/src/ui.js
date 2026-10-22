@@ -106,7 +106,7 @@ export class UI {
             <h2>RIVALS &amp; SECRETS</h2>
             <p>Whoever wrecks you becomes your <b>RIVAL</b>: take them out for a big <b>PAYBACK</b> boost. Every track hides <b>shortcuts</b> (some behind fences, some with <b>ramps</b>: drift into the jump for a <b>flat spin</b>, keep holding drift for an <b>aerial donut</b>, or <b>barrel roll</b> off a half ramp) and four <b>signature takedown</b> spots. Earn <b>three stars</b> per track (win, 5 takedowns, no crashes) and unlock new paints with takedowns and stars.</p>
             <h2>SET PIECES</h2>
-            <p><b>Loops</b>, <b>corkscrews</b> and <b>spirals</b> carry you round (nothing can wreck you on them) and pay out boost. Take <b>jumps</b> flat out: come up short and you drop in. Ride high on a <b>wall-ride</b> for boost. At a <b>level crossing</b> watch the lights: a train flattens anything in its way, and a rival shoved under one is a <b>TRAIN WRECK</b>.</p>
+            <p><b>Loops</b>, <b>corkscrews</b> and <b>spirals</b> carry you round (nothing can wreck you on them) and pay out boost. Take <b>jumps</b> flat out: come up short and you drop in. Ride high on a <b>wall-ride</b> for boost. On <b>ice</b> the tyres barely grip: steer gently. At a <b>level crossing</b> watch the lights: a train flattens anything in its way, and a rival shoved under one is a <b>TRAIN WRECK</b>.</p>
             <h2>POWER-UPS</h2>
             <p class="note">Every block shows what's inside. Drive through one to grab it (a new one replaces the one you hold). Rivals use them too.</p>
             ${POWER_IDS.map((id) => `<p class="pw">${icon(id)}<b style="color:${POWERS[id].color}">${POWERS[id].name}</b> ${POWERS[id].desc.toLowerCase()}</p>`).join('')}
