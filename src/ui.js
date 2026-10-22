@@ -20,7 +20,8 @@ function trackShape(m) {
   const map = (x, z) => [(W / 2 + (x - (x0 + x1) / 2) * k).toFixed(1), (H / 2 + (z - (z0 + z1) / 2) * k).toFixed(1)];
   const d = pts.map(([x, , z], i) => `${i ? 'L' : 'M'}${map(x, z).join(' ')}`).join('') + 'Z';
   const [sx, sy] = map(pts[0][0], pts[0][2]);
-  const loops = (m.layout.loops || []).map((lp) => { const [lx, ly] = map((lp.from[0] + lp.to[0]) / 2, (lp.from[1] + lp.to[1]) / 2); return `<circle class="lp" cx="${lx}" cy="${ly}" r="3.4"/>`; }).join('');
+  // set pieces (loops, corkscrews, helixes, jumps, wall-rides) get a marker
+  const loops = (m.layout.features || []).filter((f) => f.type !== 'tunnel').map((f) => { const c = f.at || [(f.from[0] + f.to[0]) / 2, (f.from[1] + f.to[1]) / 2]; const [lx, ly] = map(c[0], c[1]); return `<circle class="lp" cx="${lx}" cy="${ly}" r="3.4"/>`; }).join('');
   const svg = `<svg class="tmap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="rd0" d="${d}"/><path class="rd" d="${d}"/>${loops}<rect class="st" x="${sx - 1.8}" y="${sy - 1.8}" width="3.6" height="3.6"/></svg>`;
   shapes.set(m.id, svg);
   return svg;

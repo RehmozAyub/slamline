@@ -1,10 +1,12 @@
 // Spatial index of a road centreline for fast "distance to the road" queries (pure, no three.js).
 export class TrackIndex {
-  constructor(track, cell = 40) {
+  // keep(i): optional filter of centreline samples to index (left out: no road there)
+  constructor(track, cell = 40, keep = null) {
     this.track = track;
     this.cell = cell;
     this.map = new Map();
     for (let i = 0; i < track.n; i += 2) {
+      if (keep && !keep(i)) continue;
       const k = this.key(Math.floor(track.x[i] / cell), Math.floor(track.z[i] / cell));
       if (!this.map.has(k)) this.map.set(k, []);
       this.map.get(k).push(i);

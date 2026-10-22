@@ -4,12 +4,13 @@ import { TrackPath } from './trackMath.js';
 import { TrackIndex, CompositeIndex } from './terrain.js';
 import { findShortcuts, shortcutsFromSpecs, ShortcutSet, SHORTCUT } from './shortcut.js';
 import { LAYOUT_SCALE } from './maps/layouts.js';
-import { layoutFeatures } from './loop.js';
+import { layoutFeatures } from './features.js';
+import { buildTunnels, tunnelShade } from './tunnel.js';
 
 // The shortcut search takes about a second per track, so its result ({a, b, side} per shortcut)
 // is kept in localStorage; it only changes if the search rules or layouts change.
 const SC_KEY = 'slamline.shortcuts.' + JSON.stringify([SHORTCUT, LAYOUT_SCALE]).split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7);
-// avoid: main-road stretches no shortcut may touch (a loop, the tunnels); part of the cache key
+// avoid: main-road stretches no shortcut may touch (set pieces, tunnels); part of the cache key
 function shortcutsFor(id, track, index, avoid = []) {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SC_KEY) || '{}'); } catch { /* storage unavailable */ }
@@ -28,9 +29,10 @@ import { addWorldDetail } from './detail.js';
 export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const scene = new THREE.Scene();
   const track = new TrackPath(def.layout.points, { width: def.layout.width });
-  // loop-the-loops (see loop.js), and the stretches of road in tunnels: [s from, s to]
-  const { loops, tunnels, avoid } = layoutFeatures(track, def.layout);
-  const mainIndex = new TrackIndex(track);
+  // set pieces (features.js): rails (loops, corkscrews, helixes), jumps, wall-rides, tunnels
+  const { rails, jumps, banks, tunnels, crossings, avoid } = layoutFeatures(track, def.layout);
+  // (a jump's gap is no road: the terrain there is the map's own, a gorge or a cove)
+  const mainIndex = new TrackIndex(track, 40, jumps.length ? (i) => !jumps.some((j) => j.inGap(i * track.step)) : null);
   const shortcuts = new ShortcutSet(track, shortcutsFor(def.id, track, mainIndex, avoid));
   // scenery and terrain keep clear of (and flatten along) every road
   const index = new CompositeIndex([mainIndex, ...shortcuts.list.map((sc) => new TrackIndex(sc.path, 30))]);
@@ -52,12 +54,14 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const hemi = new THREE.HemisphereLight(def.hemi.sky, def.hemi.ground, def.hemi.intensity);
   scene.add(hemi);
 
-  const trackGroup = buildTrackMeshes(track, def.trackStyle, glRenderer.capabilities.getMaxAnisotropy(), asphalt, shortcuts, loops);
+  const trackGroup = buildTrackMeshes(track, def.trackStyle, glRenderer.capabilities.getMaxAnisotropy(), asphalt, shortcuts, { rails, jumps, banks, crossings });
   scene.add(trackGroup);
+  const tunnelGroup = tunnels.length ? buildTunnels(track, tunnels, def.tunnels || {}) : null;
+  if (tunnelGroup) scene.add(tunnelGroup);
 
   const envScene = new THREE.Scene();
   envScene.add(createSky(def.sky, 400));
-  const scenery = def.build({ scene, track, index, density: quality.density, envScene, sunDir, shortcut: shortcuts, loops, tunnels }) || {};
+  const scenery = def.build({ scene, track, index, density: quality.density, envScene, sunDir, shortcut: shortcuts, rails, jumps, banks, tunnels, crossings }) || {};
   // rock-like scenery (flat-shaded vertex-coloured instances: rocks, mesas, ruins) gets stone grain
   const detailed = new Set();
   scene.traverse((o) => {
@@ -76,11 +80,14 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
 
   const weathers = def.weather ? [new Weather(scene, def.weather, 1)] : [];
   const weather = weathers[0] || null;
-  const hemiBase = hemi.intensity;
+  const hemiBase = hemi.intensity, sunBase = sun.intensity, envBase = scene.environmentIntensity;
+  let shade = 0; // 0 in daylight - 1 deep in a tunnel (eased)
 
   const snap = 1;
   const world = {
-    def, scene, track, index, shortcuts, loops, tunnels, sky, sun, hemi, weather, landmark: scenery.landmark || null,
+    def, scene, track, index, shortcuts, rails, jumps, banks, tunnels, crossings, sky,
+    // trains running over level crossings: [{ train, s (main road), tc (along the line), w }]
+    trains: scenery.trains || [], sun, hemi, weather, landmark: scenery.landmark || null,
     flash: 0,
     // split screen: a second weather box that only player 2's camera sees
     setViewCount(n) {
@@ -104,13 +111,18 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
         weather.update(dt, time, camera);
         world.flash = weather.flash;
         sky.material.uniforms.uFlash.value = weather.flash;
-        hemi.intensity = hemiBase + weather.flash * 2.5;
       }
+      // in a tunnel the daylight fades out: lights and reflections dim while the camera is inside
+      if (tunnels.length) shade += (tunnelShade(track, tunnels, camera.position) - shade) * Math.min(1, dt * 5);
+      hemi.intensity = (hemiBase + world.flash * 2.5) * (1 - 0.4 * shade);
+      sun.intensity = sunBase * (1 - 0.8 * shade);
+      scene.environmentIntensity = envBase * (1 - 0.6 * shade);
       const fx = Math.round(focus.x / snap) * snap, fz = Math.round(focus.z / snap) * snap;
       sun.position.set(fx + sunDir.x * 350, focus.y + sunDir.y * 350, fz + sunDir.z * 350);
       sun.target.position.set(fx, focus.y, fz);
       if (scenery.update) scenery.update(dt, time, camera, focus);
       trackGroup.userData.update(time);
+      if (tunnelGroup) tunnelGroup.userData.update(time);
     },
     setShadowQuality(q) {
       sun.castShadow = q.shadows;

@@ -7,6 +7,7 @@
 // the main road (the fork and the merge) the barriers between the two are left out.
 import { TrackIndex } from './terrain-index.js';
 import { wrapAngle } from './trackMath.js';
+import { jumpAt, bankAt } from './features.js';
 
 export const SHORTCUT = {
   width: 11,
@@ -405,10 +406,10 @@ function airStep(v, ground, dt, ramp, tangent = null) {
   if (!v.air) {
     const last = v.lastGround ?? ground;
     const vyG = (ground - last) / Math.max(dt, 1e-4);
-    if (ground < last - AIR.lipDrop && (v.vyGround ?? 0) > AIR.minLaunch) {
-      // off the lip: take off
+    // off the lip: take off (where the road just stops - a jump's gap - even a slow car falls)
+    if (ground < last - AIR.lipDrop && ((v.vyGround ?? 0) > AIR.minLaunch || last - ground > 5)) {
       v.air = true;
-      v.vy = Math.min(AIR.maxLaunch, v.vyGround);
+      v.vy = ramp && ramp.launch ? ramp.launch : Math.min(AIR.maxLaunch, Math.max(0, v.vyGround ?? 0));
       v.airY = last;
       v.airTime = 0;
       v.trick = null;
@@ -476,7 +477,8 @@ function airStep(v, ground, dt, ramp, tangent = null) {
 // roads is open, and a car crossing that edge switches roads. On a shortcut, v.s is mapped back
 // onto the main road (so race progress keeps working) and v.sc / v.scU / v.scIdx hold the
 // position along it. Returns the wall hit (if any) like Vehicle.constrain.
-export function constrainOnRoads(v, track, set, dt = 1 / 120, tmpP = {}, tmpQ = {}) {
+// jumps, banks: the main road's jumps and wall-rides (features.js), or null
+export function constrainOnRoads(v, track, set, dt = 1 / 120, tmpP = {}, tmpQ = {}, jumps = null, banks = null) {
   const list = set ? set.list : [];
   const lim = track.halfWidth - 1.1;
   if (v.onSC && v.sc) {
@@ -531,7 +533,24 @@ export function constrainOnRoads(v, track, set, dt = 1 / 120, tmpP = {}, tmpQ = 
       if (Math.sign(q.lateral) === toMain && Math.abs(q.lateral) <= sc.path.halfWidth + SHORTCUT.free) free = side;
     }
   }
-  const hit = v.constrain(track, free);
-  airStep(v, v.y, dt, null);
+  // on a wall-ride the curl slopes back toward the middle of the road: the higher a car rides
+  // up it, the harder it is pulled back down (and its lip wall is soft)
+  const b = banks && banks.length && !v.air ? bankAt(banks, p.s) : null;
+  let soft = 0;
+  if (b) {
+    const a = b.profile(p.s, p.lateral, tmpQ).a;
+    if (a > 0.05) { const k = -b.side * 17 * Math.sin(a) * dt; v.vx += p.rx * k; v.vz += p.rz * k; }
+    if (b.amount(p.s) > 0.3) soft = b.side;
+  }
+  const hit = v.constrain(track, free, soft);
+  // main-road jumps (features.js): the kicker lifts the road and works as a launch pad (anyone
+  // slower is brought up to speed so they clear the gap); the gap drops away under the car
+  const j = jumps && jumps.length ? jumpAt(jumps, v.s) : null;
+  if (j && !v.air && j.onRamp(v.s) && v.vx * p.tx + v.vz * p.tz > 3) {
+    const sp = Math.hypot(v.vx, v.vz);
+    if (sp < j.minSpeed) { v.vx *= j.minSpeed / sp; v.vz *= j.minSpeed / sp; }
+  }
+  airStep(v, v.y + (j ? j.lift(v.s) : 0), dt, j, j ? p : null);
+  if (j && !v.air && j.onRamp(v.s)) v.pitch -= Math.atan(j.slope(v.s)); // nose up the kicker
   return hit;
 }

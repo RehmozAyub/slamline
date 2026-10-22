@@ -18,7 +18,8 @@ import { PickupVisuals } from './pickups.js';
 import { DriveAssist, ASSIST_RULES } from './assist.js';
 import { signatureAt, hairpinS } from './signatures.js';
 import { constrainOnRoads } from './shortcut.js';
-import { tryEnterLoop, loopStep, loopContacts } from './loop.js';
+import { tryEnterRail, railStep, railContacts } from './rail.js';
+import { jumpAt, bankAt } from './features.js';
 import { FenceProps } from './props.js';
 import { RivalMarkers } from './markers.js';
 
@@ -51,7 +52,10 @@ export class RaceSession {
     this.track = world.track;
     this.def = world.def;
     this.shortcuts = world.shortcuts || null; // ShortcutSet
-    this.loops = world.loops || []; // LoopRail list (loop.js)
+    this.rails = world.rails || []; // loops, corkscrews, helixes (rail.js)
+    this.jumps = world.jumps || []; // gaps to fly (features.js)
+    this.banks = world.banks || []; // wall-rides (features.js)
+    this.trains = world.trains || []; // trains over level crossings: { train, s, tc, w }
     this.landmark = world.landmark || null;
     this.hairpin = hairpinS(this.track);
     this.tmpP = {}; this.tmpQ = {};
@@ -152,7 +156,8 @@ export class RaceSession {
     for (const c of this.cars) this.race.update(c.id, c.vehicle.s, 0);
 
     // road pickups and power-up objects
-    const pickList = layoutPickups(L, this.track.halfWidth, { rand }).filter((p) => !this.nearLoop(p.s, 25));
+    // (none on a set piece: they would float over a curl or a gap)
+    const pickList = layoutPickups(L, this.track.halfWidth, { rand }).filter((p) => !this.nearRail(p.s, 25) && !jumpAt(this.jumps, p.s, 30) && !this.banks.some((b) => b.inSpan(p.s, 10)));
     for (const sc of this.shortcuts ? this.shortcuts.list : []) {
       if (!sc.boostRing) continue;
       // a boost ring halfway along: a reason to find this one
@@ -290,6 +295,7 @@ export class RaceSession {
     }
 
     // controls
+    if (this.trains.length) this.trainCaps();
     const hp = this.humanProgress();
     for (const c of this.cars) {
       const v = c.vehicle;
@@ -322,14 +328,16 @@ export class RaceSession {
       for (const c of this.cars) {
         if (c.remote) { if (c.vehicle.wrecked) c.vehicle.updateWreck(h); continue; } // driven on the other device
         const v = c.vehicle, prevU = v.onSC ? v.scU : -1, prevSC = v.sc;
-        if (v.loop) { if (loopStep(v, c.controls, h, c.mul, !!c.human) === 'done') this.onLoopDone(c); continue; }
+        if (v.ride) { const rail = v.ride.rail, out = railStep(v, c.controls, h, c.mul, !!c.human); if (out === 'done') this.onRailDone(c, rail); continue; }
         v.update(h, c.controls, c.mul);
         const hit = this.constrainCar(c, h);
         if (hit) this.onWallHit(c, hit);
+        if (v.air && this.jumps.length) this.checkGap(c);
+        if (this.trains.length && !v.wrecked && v.ghost <= 0) this.checkTrains(c);
         if (v.onSC && v.sc === prevSC && v.sc.fence && this.fences.hit(v.sc, prevU, v.scU, v)) this.onFence(c);
-        if (this.loops.length && tryEnterLoop(v, this.loops, this.track, this.tmpL || (this.tmpL = {}))) this.onLoopEnter(c);
+        if (this.rails.length && tryEnterRail(v, this.rails, this.track, this.tmpL || (this.tmpL = {}))) this.onRailEnter(c);
       }
-      if (this.loops.length) loopContacts(this.vehicles);
+      if (this.rails.length) railContacts(this.vehicles);
       this.collide();
     }
     for (const c of this.cars) if (c.vehicle.events && c.vehicle.events.length) this.onAirEvents(c);
@@ -345,6 +353,7 @@ export class RaceSession {
     if (racing) this.updatePickups(dt);
     this.pickVis.update(dt, this.time);
     this.updateFx(dt);
+    if (this.banks.length) this.updateBanks(dt);
     this.syncModels();
     this.updatePresentation(realDt, dt);
     if (this.net) this.net.afterUpdate(realDt);
@@ -356,7 +365,60 @@ export class RaceSession {
   // back onto the main road (so race progress keeps working) and v.scU / v.scIdx hold the
   // position along the shortcut.
   constrainCar(c, dt) {
-    return constrainOnRoads(c.vehicle, this.track, this.shortcuts, dt, this.tmpP, this.tmpQ);
+    return constrainOnRoads(c.vehicle, this.track, this.shortcuts, dt, this.tmpP, this.tmpQ, this.jumps, this.banks);
+  }
+
+  // --- trains at level crossings (train.js) ----------------------------------------------
+  // AI rivals ease off for a train that will be on the crossing when they get there
+  trainCaps() {
+    for (const e of this.trains) e.fc = e.train.crossing(e.tc, e.w, e.fc || {});
+    for (const c of this.cars) {
+      if (!c.ai) continue;
+      const v = c.vehicle;
+      let cap = null;
+      for (const e of this.trains) {
+        const d = this.track.deltaS(v.s, e.s);
+        if (d < 0 || d > 280) continue;
+        const eta = d / Math.max(v.speed, 5);
+        if (!e.fc.now && !(eta > e.fc.tIn - 0.8 && eta < e.fc.tOut + 0.3)) continue;
+        // get there just after it has gone (or stop short if it isn't going)
+        const after = Number.isFinite(e.fc.tOut) ? d / (e.fc.tOut + 0.4) : Math.sqrt(2 * 22 * Math.max(0, d - e.w - 6));
+        cap = Math.min(cap ?? Infinity, after);
+      }
+      c.ai.speedCap = cap;
+    }
+  }
+
+  // run over by a train: a human is flattened; a rival shoved in front of it is a takedown
+  checkTrains(c) {
+    const v = c.vehicle;
+    if (v.ride || v.air) return;
+    for (const e of this.trains) {
+      if (Math.abs(this.track.deltaS(v.s, e.s)) > 30 || !e.train.hits(v.x, v.z, 1.1, this.tmpT || (this.tmpT = {}))) continue;
+      if (c.remote) return;
+      const P = e.train.at(e.tc, {}), dx = P.dx * e.train.dir, dz = P.dz * e.train.dir;
+      if (c.human) this.crashHuman(c.human, 'FLATTENED', dx, dz);
+      else {
+        const by = c.pushedBy && c.pushedBy.human && this.time - c.pushedAt < 2.5 ? c.pushedBy : null;
+        if (by) this.takedown(c, dx, dz, 'TRAIN WRECK', false, by);
+        else {
+          c.crashS = v.s; v.crash(dx, dz, 1.6); c.respawn = 3;
+          this.fx.explosion(v.x, v.y + 0.6, v.z, v.vx, v.vz, c.paint, v.y);
+          if (this.audibility(v) > 0.05) this.game.audio.crash();
+        }
+      }
+      return;
+    }
+  }
+
+  // fell short of a jump: down into the gap, and back on the road past it
+  checkGap(c) {
+    const v = c.vehicle, j = jumpAt(this.jumps, v.s);
+    if (!j || !j.inGap(v.s) || v.airY > this.track.y[v.idx] - 7) return;
+    if (c.remote) return;
+    if (c.human) this.crashHuman(c.human, 'WIPED OUT', -Math.sin(v.heading), -Math.cos(v.heading));
+    else { v.crash(0, 0, 0.6); c.respawn = 2.6; this.fx.explosion(v.x, v.airY + 0.6, v.z, v.vx, v.vz, c.paint, v.airY); }
+    c.crashS = this.track.wrapS(j.sLand + 12);
   }
 
   // smashed through a fence into a hidden shortcut
@@ -391,32 +453,51 @@ export class RaceSession {
     v.events.length = 0;
   }
 
-  // --- loop-the-loop (loop.js) ----------------------------------------------------------
-  // is main-road position s on (or within `margin` of) a loop's rail?
-  nearLoop(s, margin = 0) {
-    return this.loops.some((r) => { const d = this.track.deltaS(r.sA - margin, s); return d >= 0 && d <= this.track.deltaS(r.sA, r.sB) + 2 * margin; });
+  // --- set pieces: rails (rail.js), wall-rides (features.js) ----------------------------
+  // is main-road position s on (or within `margin` of) a rail?
+  nearRail(s, margin = 0) {
+    return this.rails.some((r) => { const d = this.track.deltaS(r.sA - margin, s); return d >= 0 && d <= this.track.deltaS(r.sA, r.sB) + 2 * margin; });
   }
 
-  // in the loop proper (not its flat lead-in or lead-out)
-  inLoop(s) { return this.loops.some((r) => r.inLoop(s)); }
+  // in a set piece proper (not its flat lead-in or lead-out)
+  inRail(s) { return this.rails.some((r) => r.inSpan(s)); }
 
-  onLoopEnter(c) {
+  onRailEnter(c) {
     const H = c.human;
     if (!H) return;
     this.shake(H, 0.25);
     this.game.audio.whoosh(true, 0.3);
   }
 
-  // made it round: boost for a human, and a chime
-  onLoopDone(c) {
-    const H = c.human;
-    if (!H || this.state !== 'racing') return;
-    this.scoreEvent(H, 'LOOP THE LOOP', H.boost.event(RULES.nearMissGain * 1.6));
+  // made it through: boost for a human, and a chime (off a helix it's the landing that pays)
+  onRailDone(c, rail) {
+    const H = c.human, name = { loop: 'LOOP THE LOOP', corkscrew: 'CORKSCREW' }[rail.kind];
+    if (!H || !name || this.state !== 'racing') return;
+    this.scoreEvent(H, name, H.boost.event(RULES.nearMissGain * 1.6));
     this.game.audio.whoosh(false, 0.35);
   }
 
-  // where a car is drawn (on a loop: up on the rail, not its track-space spot)
-  viewFocus(v) { return v.loopPose && !v.wrecked ? v.loopPose : v; }
+  // Drawn poses on the wall-rides: a car on a curl leans with it (v.pose, like on a rail).
+  // Humans riding high on the wall for a while get boost when they come down.
+  updateBanks(dt) {
+    for (const c of this.cars) {
+      const v = c.vehicle;
+      if (v.ride) continue;
+      const b = !v.wrecked && !v.air && !v.onSC ? bankAt(this.banks, v.s) : null;
+      v.pose = b ? b.pose(v.s, v.lateral, v.heading, v.bankPose || (v.bankPose = {})) : null;
+      const H = c.human;
+      if (!H) continue;
+      const high = v.pose && v.pose.roll > 0.8;
+      if (high) H.wallTime = (H.wallTime || 0) + dt;
+      else if (H.wallTime) {
+        if (H.wallTime > 0.6 && this.state === 'racing') this.scoreEvent(H, `WALL RIDE ${H.wallTime.toFixed(1)}s`, H.boost.event(6 + H.wallTime * 9));
+        H.wallTime = 0;
+      }
+    }
+  }
+
+  // where a car is drawn (on a rail or a curl: its 3D pose, not its track-space spot)
+  viewFocus(v) { return v.pose && !v.wrecked ? v.pose : v; }
 
   // road direction under a car (the shortcut's when it is on it)
   roadHeading(v) {
@@ -482,7 +563,7 @@ export class RaceSession {
     for (const H of this.humans) {
       const pressed = H.input.power && !H.powerHeld;
       H.powerHeld = !!H.input.power;
-      if (pressed && H.car.power && this.state === 'racing' && !H.finished && !H.car.vehicle.wrecked && !H.car.vehicle.loop) this.usePower(H.car);
+      if (pressed && H.car.power && this.state === 'racing' && !H.finished && !H.car.vehicle.wrecked && !H.car.vehicle.ride) this.usePower(H.car);
     }
     if (this.state === 'racing') this.updateAIPowers(dt);
 
@@ -512,7 +593,7 @@ export class RaceSession {
       if (c.human || !c.power || c.remote || c.isPlayer) continue;
       c.powerTime += dt;
       const v = c.vehicle;
-      if (this.aiPowerCooldown > 0 || c.powerTime < R.minHold || v.wrecked || v.ghost > 0 || v.loop) continue;
+      if (this.aiPowerCooldown > 0 || c.powerTime < R.minHold || v.wrecked || v.ghost > 0 || v.ride) continue;
       if (Math.random() > dt * R.useRate) continue;
       if (!aiWantsPower(c.power, this.aiPowerContext(c))) continue;
       this.usePower(c);
@@ -613,7 +694,7 @@ export class RaceSession {
       if (H) this.popup('OIL SLICK', 'DROPPED BEHIND YOU', 'power', H);
     } else if (kind === 'strike') {
       const pe = this.race.byId.get(me.id);
-      const rivals = others.filter((c) => c.vehicle.ghost <= 0 && !c.vehicle.loop).map((c) => ({ car: c, wrecked: c.vehicle.wrecked, progress: this.race.byId.get(c.id).progress }));
+      const rivals = others.filter((c) => c.vehicle.ghost <= 0 && !c.vehicle.ride).map((c) => ({ car: c, wrecked: c.vehicle.wrecked, progress: this.race.byId.get(c.id).progress }));
       const t = strikeTarget(pe.progress, rivals);
       if (!t) { if (H) this.popup('LIGHTNING STRIKE', 'NO TARGET AHEAD', '', H); return; }
       me.power = null;
@@ -668,7 +749,7 @@ export class RaceSession {
     const R = PICKUP_RULES;
     for (let i = this.shots.length - 1; i >= 0; i--) {
       const sh = this.shots[i];
-      const valid = (c) => c !== sh.owner && !c.vehicle.wrecked && c.vehicle.ghost <= 0 && !c.vehicle.air && !c.vehicle.loop;
+      const valid = (c) => c !== sh.owner && !c.vehicle.wrecked && c.vehicle.ghost <= 0 && !c.vehicle.air && !c.vehicle.ride;
       // along-road gap from the shot to car c, or null when c is on another road
       const gap = (c) => { const at = this.roadPos(c); return at.sc !== sh.sc ? null : { ds: this.roadOf(sh.sc).deltaS(sh.s, at.s), lat: at.lat }; };
       let target = null, best = 90;
@@ -693,7 +774,7 @@ export class RaceSession {
           const q = this.track.project(p.x, p.z);
           sh.sc = null; sh.s = q.s; sh.lat = Math.max(-this.track.halfWidth + 1, Math.min(this.track.halfWidth - 1, q.lateral));
         }
-        if (!sh.sc && this.inLoop(sh.s)) { sh.t = Infinity; break; } // shots don't go round a loop
+        if (!sh.sc && this.inRail(sh.s)) { sh.t = Infinity; break; } // shots don't go round a loop
 
         for (const c of this.cars) {
           const g = valid(c) && !c.remote && gap(c);
@@ -832,7 +913,7 @@ export class RaceSession {
         if (!moveA && !moveB) continue;
         if (A.ghost > 0 || B.ghost > 0) continue;
         if (A.air || B.air || Math.abs(A.y - B.y) > 1.6) continue; // in the air off a ramp: no contact
-        if (A.loop || B.loop) continue; // on a loop: loopContacts handles it
+        if (A.ride || B.ride) continue; // on a loop: railContacts handles it
         if (A.wrecked && B.wrecked) continue;
         const dx0 = B.x - A.x, dz0 = B.z - A.z;
         if (dx0 * dx0 + dz0 * dz0 > 36) continue;
@@ -916,7 +997,9 @@ export class RaceSession {
     if (hit.vn > 3) this.fx.sparks(hit.x, hit.y, hit.z, v.vx, v.vz, Math.min(30, hit.vn * 2), Math.min(2, hit.vn / 12));
     if (v.wrecked || this.state !== 'racing') return;
     const H = c.human;
-    const flying = v.air || v.landCool > 0; // off a ramp or just landed: walls only bounce
+    const bank = this.banks.length ? bankAt(this.banks, v.s) : null;
+    // off a ramp, just landed, or riding up a wall-ride: walls only bounce
+    const flying = v.air || v.landCool > 0 || (bank && Math.sign(v.lateral) === bank.side);
     if (H) {
       if (!H.finished && !flying && isWallCrash({ speed: hit.speed, angleDeg: hit.angle }, H.assistOn ? ASSIST_RULES : RULES)) {
         this.crashHuman(H, 'WRECKED', hit.nx, hit.nz);
@@ -938,7 +1021,7 @@ export class RaceSession {
   // already did the crediting.
   takedown(c, dirX, dirZ, label = 'TAKEDOWN!', quiet = false, byCar = this.player, fromNet = false) {
     const v = c.vehicle;
-    if (v.wrecked || v.loop) return; // nothing wrecks a car going round a loop
+    if (v.wrecked || v.ride) return; // nothing wrecks a car going round a loop
     if (c.remote) {
       if (!fromNet) this.net.wreck(c, dirX, dirZ, label, quiet, byCar);
       this.showRemoteWreck(c, dirX, dirZ);
@@ -1010,7 +1093,7 @@ export class RaceSession {
 
   crashHuman(H, label, dirX, dirZ, byCar = null) {
     const car = H.car, v = car.vehicle;
-    if (v.wrecked || v.loop) return;
+    if (v.wrecked || v.ride) return;
     car.crashS = v.s;
     v.crash(dirX, dirZ, 1);
     car.respawn = 2.4;
@@ -1040,7 +1123,8 @@ export class RaceSession {
       }
     }
     // never back on the road in a loop's stretch: just past it instead
-    for (const r of this.loops) if (this.track.deltaS(r.sA - 25, s) >= 0 && this.track.deltaS(s, r.sB) >= 0) s = this.track.wrapS(r.sB + 18);
+    for (const r of this.rails) if (this.track.deltaS(r.sA - 25, s) >= 0 && this.track.deltaS(s, r.sB) >= 0) s = this.track.wrapS(r.sB + 18);
+    for (const j of this.jumps) if (j.near(s, 25)) s = this.track.wrapS(j.sLand + 12);
     v.placeOnTrack(this.track, s, c.human ? 0 : c.ai.lane, c.human ? 24 : 20);
     v.ghost = 1.6;
     c.respawn = 0;
@@ -1050,7 +1134,7 @@ export class RaceSession {
     const H = this.humans[i];
     if (!H) return;
     const v = H.car.vehicle;
-    if (v.wrecked || v.loop || this.state !== 'racing') return;
+    if (v.wrecked || v.ride || this.state !== 'racing') return;
     v.placeOnTrack(this.track, v.s, 0, 0);
     v.ghost = 1.5;
   }
@@ -1068,7 +1152,7 @@ export class RaceSession {
       }
       const fxv = Math.sin(v.heading), fzv = Math.cos(v.heading);
       const rx = -fzv, rz = fxv;
-      const skidding = !v.air && !v.loop && (v.drifting || Math.abs(v.slip) > 0.2 || (v.braking && v.speed > 25)) && v.speed > 8;
+      const skidding = !v.air && !v.pose && (v.drifting || Math.abs(v.slip) > 0.2 || (v.braking && v.speed > 25)) && v.speed > 8;
       for (const side of [-1, 1]) {
         const wx = v.x + rx * side * 0.95 - fxv * c.model.halfBase;
         const wz = v.z + rz * side * 0.95 - fzv * c.model.halfBase;
@@ -1076,13 +1160,13 @@ export class RaceSession {
         const sliding = !v.air && (v.drifting || Math.abs(v.slip) > 0.28);
         if (sliding && v.speed > 8 && Math.random() < dt * (v.drifting ? 40 : 14)) fx.tyreSmoke(wx, v.y, wz, v.vx, v.vz, v.drifting ? 1.1 : 0.6);
       }
-      if (spray && !v.air && !v.loop && v.speed > 16 && this.nearestHuman(v).d2 < 120 * 120 && Math.random() < dt * v.speed * (c.human ? 0.12 : 0.3)) {
+      if (spray && !v.air && !v.pose && v.speed > 16 && this.nearestHuman(v).d2 < 120 * 120 && Math.random() < dt * v.speed * (c.human ? 0.12 : 0.3)) {
         const side = Math.random() < 0.5 ? -1 : 1;
         fx.smoke.spawn(v.x + rx * side * 0.95 - fxv * (c.model.halfBase + 0.4), v.y + 0.3, v.z + rz * side * 0.95 - fzv * (c.model.halfBase + 0.4),
           v.vx * 0.35 + (Math.random() - 0.5) * 2, 1 + Math.random() * 1.5, v.vz * 0.35 + (Math.random() - 0.5) * 2,
           0.3 + Math.random() * 0.25, 0.3, spray[0], spray[1], spray[2], { drag: 0.2, grow: 0.9, grav: 2, alpha: 0.22 });
       }
-      if (v.scraping > 0.5 && v.speed > 8) {
+      if (v.scraping > 0.5 && v.speed > 8 && !v.pose) {
         const side = Math.sign(v.lateral);
         fx.sparks(v.x + rx * side * 1.1, v.y + 0.4, v.z + rz * side * 1.1, v.vx, v.vz, 2, 0.6);
       }
@@ -1099,7 +1183,7 @@ export class RaceSession {
         m.body.rotation.set(0, 0, 0);
         for (const w of m.wheels) w.group.position.y = m.wheelR - 0.6;
       } else {
-        const P = v.loopPose;
+        const P = v.pose;
         if (P) {
           // going round a loop: drawn on the rail (x = left, y = the rail's up, z = forward)
           this.tmpM.makeBasis(this.tmpV.set(-P.bx, -P.by, -P.bz), this.tmpV2.set(P.ux, P.uy, P.uz), this.tmpV3.set(P.tx, P.ty, P.tz));
@@ -1127,7 +1211,7 @@ export class RaceSession {
     const v = c.vehicle, m = c.model;
     m.root.updateMatrixWorld();
     // on a loop the car really moves along the rail, not along its track-space line
-    const P = v.loopPose, sp = v.loop ? v.loop.vF : 0;
+    const P = v.pose, sp = v.ride ? v.ride.vF : v.speed;
     const bx = P ? -P.tx : -Math.sin(v.heading), bz = P ? -P.tz : -Math.cos(v.heading);
     const vx = P ? P.tx * sp : v.vx, vz = P ? P.tz * sp : v.vz;
     for (const e of m.exhausts) {

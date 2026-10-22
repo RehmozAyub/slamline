@@ -24,11 +24,14 @@ export class CameraRig {
     this.fovScale = 1; // < 1 for the very wide split-screen views
     this.up = new THREE.Vector3(0, 1, 0); // eases round with the car on a loop
     this.upTarget = new THREE.Vector3(0, 1, 0);
+    this.tmpUp = new THREE.Vector3();
   }
 
-  // camera "up": the car's up on a loop, the world's otherwise
+  // camera "up": the car's up on a rail, the world's otherwise; on a wall-ride (a pose with a
+  // roll) only part of the way, so the horizon stays readable
   easeUp(dt, P = null) {
     if (P) this.upTarget.set(P.ux, P.uy, P.uz); else this.upTarget.set(0, 1, 0);
+    if (P && P.roll !== undefined) this.upTarget.lerp(this.tmpUp.set(0, 1, 0), 0.4).normalize();
     if (this.snap) this.up.copy(this.upTarget);
     this.up.lerp(this.upTarget, Math.min(1, dt * 9)).normalize();
     this.cam.up.copy(this.up);
@@ -86,9 +89,9 @@ export class CameraRig {
       cam.lookAt(t.x, ty, t.z);
       fovTarget = 50;
       if (c.t >= c.duration) { this.crash = null; this.snap = true; }
-    } else if (car.loopPose) {
-      // round a loop: ride the rail behind the car and roll with it
-      const m = MODES[this.mode], P = car.loopPose;
+    } else if (car.pose) {
+      // on a rail or a wall-ride: ride behind the car and roll with it
+      const m = MODES[this.mode], P = car.pose;
       this.heading = car.heading; // so the normal chase picks up smoothly at the exit
       if (m.hood) {
         this.pos.set(P.x + P.ux * 1.22 + P.tx * 0.4, P.y + P.uy * 1.22 + P.ty * 0.4, P.z + P.uz * 1.22 + P.tz * 0.4);
