@@ -2,6 +2,8 @@
 //   lava    - a lava tube: arched rock with glowing veins, lava gutters, warm lamps (Magma Core)
 //   seacave - a sea cave: a wide, rough vault of wet rock, glowing water in the gutters
 //   subway  - a cut-and-cover tunnel: tiled box with strip lights, a concrete roof at street level
+//   gallery - an avalanche gallery: a concrete roof against the mountain (spec.side: the mountain's
+//             side of the road, default -1), open to the valley between pillars, snow on top
 // Each is a shell along the road: the inside, the outside (a rock hull or a street-level slab)
 // and a portal face at both ends. While the camera is inside, world.js dims the daylight
 // (tunnelShade).
@@ -15,6 +17,7 @@ export const TUNNEL_STYLES = {
   lava: { profile: 'arch', width: 3, height: 11, hull: 'mountain', hullH: 34, inner: 'veins', glow: 0xff7a2a, glowI: 1.7, gutter: 'lava', lamps: 'warm', rock: [0x1e1816, 0x3a2e2a] },
   seacave: { profile: 'cave', width: 6, height: 13, jitter: 1.6, hull: 'mountain', hullH: 30, inner: 'wetrock', glow: 0x2ae0d0, glowI: 1.4, gutter: 'glowWater', lamps: null, rock: [0x4a3a30, 0x7a6450] },
   subway: { profile: 'box', width: 3.5, height: 7, hull: 'slab', top: 0.3, inner: 'tiles', band: '#d0206a', gutter: null, lamps: 'strip', slab: 0x55565c },
+  gallery: { profile: 'gallery', width: 3, height: 8, hull: 'gallery', inner: 'concrete', gutter: null, lamps: 'warm', slab: 0xa8a49c, roof: 0xf2f5fa, pillars: 7, shade: 0.45 },
 };
 
 // --- inner textures (canvas): a map and an emissive map --------------------------------------
@@ -72,6 +75,19 @@ const innerTextures = {
     }
     return { map: tex(rock), emissive: tex(glow) };
   },
+  // board-marked concrete, streaked by meltwater
+  concrete() {
+    const S = 512, wall = canvas(S), glow = canvas(S);
+    const g = wall.getContext('2d'), e = glow.getContext('2d');
+    noiseFill(g, S, [128, 126, 120], 34, 22);
+    const rand = rng(23);
+    g.strokeStyle = 'rgba(60,58,54,0.35)'; g.lineWidth = 2;
+    for (let y = 0; y < S; y += 32) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(S, y + 0.5); g.stroke(); }
+    g.strokeStyle = 'rgba(70,64,56,0.22)'; g.lineWidth = 3;
+    for (let k = 0; k < 30; k++) { const x = rand() * S; g.beginPath(); g.moveTo(x, rand() * S * 0.3); g.lineTo(x + (rand() - 0.5) * 6, S); g.stroke(); }
+    e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    return { map: tex(wall), emissive: tex(glow) };
+  },
   // white wall tiles with a coloured band and grime
   tiles(style) {
     const S = 512, wall = canvas(S), glow = canvas(S);
@@ -94,8 +110,27 @@ const innerTextures = {
 
 // --- cross-sections: k = 0..N from the left foot, over the top, to the right foot -----------
 const N = 24;
+// a point `f` (0-1) of the way along a polyline, by length
+function along(pts, f) {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  let d = f * total;
+  for (let i = 1; i < pts.length; i++) {
+    const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (d <= l || i === pts.length - 1) { const t = Math.min(1, d / l); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t]; }
+    d -= l;
+  }
+  return pts[pts.length - 1];
+}
+// the gallery (mountain on the left here; buildTunnels mirrors it): up the back wall and across
+// the roof to the open side. Outside: down the hillside behind, over the roof and its overhang,
+// down the fascia
+const galleryInner = (W, H) => [[-W, -1.2], [-W, H], [W, H]];
+const galleryOuter = (W, H) => [[-W - 2.5, -4], [-W - 2.5, H + 1], [W + 1.6, H + 1], [W + 1.6, H - 1.2]];
+
 function innerAt(st, hw, k) {
   const W = hw + st.width, H = st.height;
+  if (st.profile === 'gallery') return along(galleryInner(W, H), k / N);
   if (st.profile === 'box') {
     // up the left wall, across the ceiling, down the right wall (by length)
     const wall = H + 1.2, per = 2 * wall + 2 * W, d = (k / N) * per;
@@ -107,6 +142,7 @@ function innerAt(st, hw, k) {
   return [W * Math.sign(c) * Math.pow(Math.abs(c), 0.55), -1.6 + (H + 1.6) * Math.pow(s, 0.7)];
 }
 function outerAt(st, hw, k, hTop) {
+  if (st.hull === 'gallery') return along(galleryOuter(hw + st.width, st.height), k / N);
   if (st.hull === 'slab') {
     const W = hw + st.width + 3, top = hTop, wall = top + 3, per = 2 * wall + 2 * W, d = (k / N) * per;
     if (d < wall) return [-W, -3 + d];
@@ -145,6 +181,8 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     const { inner: innerMat, outer: outerMat, gutter: gutterMat } = made[t.style];
     const rockA = new THREE.Color(st.rock ? st.rock[0] : st.slab), rockB = new THREE.Color(st.rock ? st.rock[1] : st.slab), rc = new THREE.Color();
     const grass = st.grass ? new THREE.Color(st.grass) : null;
+    const gallery = st.hull === 'gallery', flip = gallery && (t.spec.side ?? -1) > 0 ? -1 : 1;
+    const roofCol = gallery ? new THREE.Color(st.roof) : null, slabCol = gallery ? new THREE.Color(st.slab) : null;
     const ia = Math.floor(t.a / track.step), ib = Math.ceil(t.b / track.step);
     const rows = [];
     for (let i = ia; i <= ib; i += 2) rows.push(((i % track.n) + track.n) % track.n);
@@ -154,7 +192,8 @@ export function buildTunnels(track, tunnels, overrides = {}) {
       let along = 0;
       for (let k = 0; k <= N; k++) {
         let [li, hi] = innerAt(st, hw, k);
-        if (st.profile !== 'box') {
+        li *= flip;
+        if (st.profile !== 'box' && !gallery) {
           const j = (noise2(i * 0.15, k * 0.9) - 0.5) * (st.jitter ?? 0.6);
           li += j * Math.sign(li); hi += j * 0.6;
         }
@@ -162,13 +201,15 @@ export function buildTunnels(track, tunnels, overrides = {}) {
         if (k) { const [pl, ph] = innerAt(st, hw, k - 1); along += Math.hypot(li - pl, hi - ph); }
         inUv.push(st.profile === 'box' ? along / 8 : (k / N) * 2.5, (r * 2 * track.step) / (st.profile === 'box' ? 8 : 16));
         let [lo, ho] = outerAt(st, hw, k, (st.top ?? 0) - y);
+        lo *= flip;
         // a hill can sink toward its ends (swell) and be craggy (crag) instead of smooth
         if (st.swell) ho = -7 + (ho + 7) * (1 - st.swell * (1 - Math.sin((Math.PI * r) / (rows.length - 1))));
         const ox = x + rx * lo, oz = z + rz * lo;
-        const bump = st.hull === 'slab' ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
+        const bump = st.hull === 'slab' || gallery ? 0 : (fbm(ox * 0.03, oz * 0.03, 3) - 0.5) * 14 + (fbm(ox * 0.13, oz * 0.13, 2) - 0.5) * (st.crag ?? 0);
         outer.push(ox + rx * bump * 0.3, y + ho + bump, oz + rz * bump * 0.3);
         rc.copy(rockA).lerp(rockB, fbm(ox * 0.02, oz * 0.02, 2));
         if (grass) rc.lerp(grass, Math.min(1, Math.max(0, (Math.sin(Math.PI * (k / N)) - 0.72) / 0.18)) * 0.9); // grass over the top
+        if (gallery) rc.copy(ho > st.height + 0.9 ? roofCol : slabCol); // snow lies on the roof
         outCol.push(rc.r, rc.g, rc.b);
       }
       if (st.lamps === 'warm' && r % 6 === 3) lamps.push({ x, y: y + st.height - 0.6, z, ry: Math.atan2(track.tx[i], track.tz[i]) });
@@ -191,6 +232,29 @@ export function buildTunnels(track, tunnels, overrides = {}) {
     const tout = new THREE.Mesh(strip(outer, [['color', outCol, 3]]), outerMat);
     tout.castShadow = true; tout.receiveShadow = true;
     group.add(tin, tout);
+    if (gallery) {
+      // the roof's underside out to the overhang, and pillars along the open side
+      const pos = [], col = [], idx = [];
+      rows.forEach((i, r) => {
+        const a = (r * (N + 1) + N) * 3;
+        pos.push(inner[a], inner[a + 1], inner[a + 2], outer[a], outer[a + 1], outer[a + 2]);
+        col.push(slabCol.r, slabCol.g, slabCol.b, slabCol.r, slabCol.g, slabCol.b);
+        if (r < rows.length - 1) { const p = r * 2; idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3); }
+      });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      group.add(new THREE.Mesh(g, outerMat));
+      const posts = [], P = {}, W = hw + st.width;
+      for (let s = t.a + 3; s < t.b - 2; s += st.pillars) {
+        track.pointAt(s, flip * (W + 0.4), P);
+        posts.push({ x: P.x, y: P.y - 0.6, z: P.z, ry: P.heading });
+      }
+      const post = new THREE.BoxGeometry(1.1, st.height + 0.7, 1.6).translate(0, (st.height + 0.7) / 2, 0);
+      group.add(instanced(post, new THREE.MeshStandardMaterial({ color: st.slab, roughness: 0.9 }), posts));
+    }
     // portal faces: the ring between the inside and the outside at both ends
     for (const r of [0, rows.length - 1]) {
       const pos = [], col = [], idx = [];
@@ -245,7 +309,7 @@ export function tunnelShade(track, tunnels, pos) {
   let inside = 0;
   for (const t of tunnels) {
     const d = Math.min(track.deltaS(t.a, q.s), track.deltaS(q.s, t.b));
-    if (d > -6) inside = Math.max(inside, Math.max(0, Math.min(1, (d + 6) / 28)));
+    if (d > -6) inside = Math.max(inside, Math.max(0, Math.min(1, (d + 6) / 28)) * ((TUNNEL_STYLES[t.style] || {}).shade ?? 1));
   }
   return inside;
 }

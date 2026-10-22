@@ -146,6 +146,14 @@ const LAYOUTS_BASE = {
       harmonics: [[2, 0.18, 2.1], [3, 0.13, 0.2], [4, 0.07, 1.1], [6, 0.045, 0.5], [8, 0.02, 2.0]],
       elevation: (th) => 30 + 20 * Math.sin(th + 0.5) + 7 * Math.sin(3 * th + 1),
     }),
+    // the ski jump over a ravine, the avalanche gallery round the high bend (the mountain on the
+    // left), the corkscrew on the viaduct across the waterfall valley
+    features: [
+      { type: 'jump', at: [256.8, 286.5], gap: 55, ramp: 30, h: 4.2, launch: 12, minSpeed: 60, sign: 'SKI JUMP' },
+      { type: 'tunnel', from: [-214.4, 414.2], to: [-329.4, 377.6], style: 'gallery', side: -1 },
+      { type: 'corkscrew', from: [339.7, -172.3], to: [415, -106.8], radius: 11 },
+      { type: 'bridge', from: [304.5, -218.2], to: [453.5, -63.3] },
+    ],
   },
   snow: {
     width: 18,
