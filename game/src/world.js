@@ -5,6 +5,7 @@ import { TrackIndex, CompositeIndex } from './terrain.js';
 import { findShortcuts, shortcutsFromSpecs, ShortcutSet, SHORTCUT } from './shortcut.js';
 import { LAYOUT_SCALE } from './maps/layouts.js';
 import { layoutFeatures } from './features.js';
+import { Smashables } from './smash.js';
 import { buildTunnels, tunnelShade } from './tunnel.js';
 
 // The shortcut search takes about a second per track, so its result ({a, b, side} per shortcut)
@@ -78,6 +79,17 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   scene.environment = envRT.texture;
   scene.environmentIntensity = def.envIntensity ?? 1;
 
+  // smashable props by the road, kept off the set pieces, the grid and the shortcuts' forks
+  const L = track.length;
+  const keepProp = (s) => s > 70 && s < L - 140
+    && !jumps.some((j) => j.near(s, 40)) && !banks.some((b) => b.inSpan(s, 30))
+    && !rails.some((r) => track.deltaS(r.sA - 30, s) >= 0 && track.deltaS(s, r.sB + 30) >= 0)
+    && !crossings.some((c) => Math.abs(track.deltaS(c.s, s)) < 40)
+    && !(shortcuts && (shortcuts.isGap(s, -1) || shortcuts.isGap(s, 1)));
+  let seed = 9173 + def.id.length * 131;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const smash = new Smashables(scene, track, def.id, keepProp, rand);
+
   const weathers = def.weather ? [new Weather(scene, def.weather, 1)] : [];
   const weather = weathers[0] || null;
   const hemiBase = hemi.intensity, sunBase = sun.intensity, envBase = scene.environmentIntensity;
@@ -87,7 +99,9 @@ export function buildWorld(def, glRenderer, quality, { asphalt }) {
   const world = {
     def, scene, track, index, shortcuts, rails, jumps, banks, tunnels, crossings, ice, sky,
     // trains running over level crossings: [{ train, s (main road), tc (along the line), w }]
-    trains: scenery.trains || [], blasts: scenery.blasts || [], sun, hemi, weather, landmark: scenery.landmark || null,
+    trains: scenery.trains || [], blasts: scenery.blasts || [], smash,
+    // the map's hazards on the road (hazards.js), and its hook for wrecks (an avalanche ...)
+    obstacles: scenery.obstacles || [], onWreck: scenery.onWreck || null, sun, hemi, weather, landmark: scenery.landmark || null,
     flash: 0,
     // split screen: a second weather box that only player 2's camera sees
     setViewCount(n) {

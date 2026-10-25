@@ -13,9 +13,12 @@ Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and 
 - 2 to 12 cars per race (Settings → CARS PER RACE; online the host picks it in the lobby)
 - 10 tracks, or **Random Track** to let the game pick. Each card shows the track's shape; the scenery loads once you pick one
 - **Set pieces:** loops, corkscrews and car-park spirals carry you round (nothing can wreck you on them) and pay out boost; jumps over gorges, coves and rivers (come up short and you drop in); avalanche galleries and temple tunnels; a frozen lake where your tyres barely grip; a low-gravity gap; a jet's blast on its take-off run (sit behind it for boost); wall-rides that curl the road up into a half-pipe (ride high for WALL RIDE boost); tunnels; and level crossings where a train flattens anything in its way (shove a rival under it for a TRAIN WRECK)
+- **Tracks that fight back:** a wreck near Alpine's avalanche gallery brings the snow down (drifts bog you down), boulders fall in Scorched Canyon (one lane stays clear), and on Skyport a jet lands on the next runway as you race the one taking off. Cones, crates, barrels, market carts, snowmen and luggage stand by the road: smash through for a bit of boost
+- **Mirrored tracks:** now and then a race runs on the track's mirror image (a MIRRORED banner at the start; signs stay readable). On by default, Settings → MIRRORED TRACKS
+- **Set-piece sounds:** the wormhole roars, the raised drawbridge groans as you come up to it, and the ski jump's crowd cheers you off the lip
 - **Paint picker**: one row of chips under the car, recoloured on the spot; hover a chip to preview it, and the paints you are still earning show how close you are
 - **2-3 secret shortcuts** on every track, marked by softly pulsing arrows at the fork (some AI rivals take them too): ramps with airtime boost (drift into a jump for a flat spin, keep holding for an aerial donut, or barrel roll off a half ramp), and hidden ones behind wooden fences you smash through
-- **Rivals:** whoever wrecks you is marked RIVAL; take them out for a PAYBACK boost
+- **Rivals:** whoever wrecks you is marked RIVAL; take them out for a PAYBACK boost. Some AI drivers have a style you'll learn: HAVOC and DIESEL are bullies who ram, KAZE and VIXEN take every shortcut, NOVA and COMET race clean and give you room
 - **Signature takedowns:** four named spots per track; the first one you find snaps a photo of the crash
 - **Three stars per track** (win, 5 takedowns, no crashes) and **earned paints** (takedowns and stars unlock 8 more, including chrome and gold)
 - **Final lap drama:** the music lifts, and a player right behind the leader gets pulled along
@@ -23,9 +26,9 @@ Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and 
 - **2-player split screen** on one keyboard (or two gamepads) — take each other out too
 - **Online rooms for 2-8 players:** ONLINE → HOST gives a 4-letter room code, friends pick JOIN and type it. Everyone plus AI rivals (the host picks how many), each on your own PC, phone or browser; pick a name, the host picks the track. Cars are sent 60 times a second and smoothed; a hit between the two of you goes to whoever hit first. No account needed: a free matchmaking service connects you, then the games talk directly. Some pairs of networks have no direct route and need a relay server (see Development)
 - Boost meter filled by drifting, near misses, slipstreaming and takedowns, with an adrenaline chain multiplier up to ×5
-- Takedowns with slow-motion crash cam; rivals can take you out too
+- Takedowns with slow-motion crash cam; rivals can take you out too. Named takedowns pay extra: GRINDER (pinned against the wall), SHUNT (rammed from behind), AIR STRIKE (hit from the air) and LANDED ON (crushed from above)
 - Road pickups: boost rings that respawn, and power-up blocks that show what they hold (grabbing a new one replaces yours; AI rivals grab about half of the blocks they drive through; pickups come back after half a second) — **Shockwave** (wrecks everyone near you), **Ricochet** (a shot that bounces down the road until it hits a rival), **Lightning Strike** (hits the car ahead), **Oil Slick** (drop it behind you — chasers crash)
-- **Phones and tablets:** touch controls, with the car accelerating by itself. Steer with a thumb slider (default), ◀ ▶ buttons or by tilting the phone. Haptics on crashes and takedowns, and an **AUTO** graphics level that picks a setting for your phone and adjusts it as it measures the frame rate
+- **Phones and tablets:** touch controls, with the car accelerating by itself. Steer with a thumb slider (default), ◀ ▶ buttons or by tilting the phone. Haptics on crashes and takedowns (a big thud on long landings and when you land on a car), and an **AUTO** graphics level that picks a setting for your phone and adjusts it as it measures the frame rate
 - Motion blur, speed lines, bloom, chromatic aberration, synthesized engine sounds and music
 
 ## Controls

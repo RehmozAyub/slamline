@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { LAYOUTS } from './layouts.js';
 import { rng, colored, merge, instanced } from '../scenery.js';
 import { addWorldDetail } from '../detail.js';
-import { windowTextures, textTexture, radialTexture } from '../textures.js';
+import { windowTextures, textTexture, radialTexture, markText } from '../textures.js';
 import { TUNNEL_STYLES } from '../tunnel.js';
 
 const CONTAINER = [0xc83a2a, 0x2a6ab0, 0x3a8a4a, 0xe8a020, 0x8a8e94, 0x6a3a8a, 0xd86a20];
@@ -60,7 +60,7 @@ function runwayTexture(num) {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(num, 128, 380);
-  const t = new THREE.CanvasTexture(c);
+  const t = markText(new THREE.CanvasTexture(c));
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
@@ -290,6 +290,22 @@ export default {
     const plumeMat = new THREE.MeshBasicMaterial({ color: 0xffc890, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
     const plumes = [-6.2, 6.2].map((x) => { const m = new THREE.Mesh(new THREE.ConeGeometry(1.1, 10, 12, 1, true).translate(0, -5, 0).rotateX(Math.PI / 2), plumeMat); m.position.set(x, 1.9, 1.4); jet.add(m); return m; });
     const J = { state: 'hold', d: holdD, v: 0, y: 0, t: 0 };
+    // and, as it starts its run, another jet comes in to land the other way on a runway further
+    // out: head-on toward the race, low, touching down and rolling out past it
+    const lane2 = out * 80;
+    {
+      const strip2 = new THREE.Mesh(new THREE.PlaneGeometry(44, rwLen - holdD + 160).rotateX(-Math.PI / 2), apronMat);
+      const c = track.pointAt(rwS0 + (holdD + rwLen + 160) / 2 - 80, lane2);
+      strip2.position.set(c.x, -0.05, c.z);
+      strip2.rotation.y = Math.atan2(dirX, dirZ);
+      strip2.receiveShadow = true;
+      scene.add(strip2);
+    }
+    const lander = jetOf(LIVERY[5]);
+    lander.visible = false;
+    scene.add(lander);
+    const LJ = { on: false, t: 0, d: 0, v: 0 };
+    const touchD = rwLen - 150;
     const blast = { active: false, x: 0, y: 0, z: 0, dx: dirX, dz: dirZ };
     const dustN = 160, dustPos = new Float32Array(dustN * 3), dustAge = new Float32Array(dustN).fill(9);
     const dg = new THREE.BufferGeometry();
@@ -539,12 +555,15 @@ export default {
       update(dt, time, camera, focus) {
         // the take-off run: holding until a car comes by on the runway, then away down it
         // (a new race starts the clock again: the jet goes back to its holding point)
-        if (time < (J.last ?? 0)) { J.state = 'hold'; J.d = holdD; J.v = 0; J.y = 0; }
+        if (time < (J.last ?? 0)) { J.state = 'hold'; J.d = holdD; J.v = 0; J.y = 0; LJ.on = false; lander.visible = false; }
         J.last = time;
         if (J.state === 'hold' && focus) {
           track.project(focus.x, focus.z, tmpQ.idx ?? -1, tmpQ);
           const ds = track.deltaS(rwS0, tmpQ.s);
-          if (ds > holdD - 60 && ds < holdD - 10 && Math.abs(tmpQ.lateral) < hw + 4) { J.state = 'roll'; J.v = 0; J.d = holdD; J.y = 0; J.t = 0; }
+          if (ds > holdD - 60 && ds < holdD - 10 && Math.abs(tmpQ.lateral) < hw + 4) {
+            J.state = 'roll'; J.v = 0; J.d = holdD; J.y = 0; J.t = 0;
+            Object.assign(LJ, { on: true, t: 0, d: rwLen + 900, v: 85 });
+          }
         }
         if (J.state !== 'hold') {
           J.t += dt;
@@ -558,6 +577,18 @@ export default {
         jet.position.set(jp.x + dirX * past, J.y, jp.z + dirZ * past);
         jet.rotation.set(J.y > 0 ? -0.14 : 0, Math.atan2(dirX, dirZ), 0);
         jet.visible = J.y < 600;
+        if (LJ.on) {
+          // down the glide slope to the far end, then braking hard along the runway
+          LJ.t += dt;
+          if (LJ.d < touchD) LJ.v = Math.max(12, LJ.v - 5 * dt);
+          LJ.d -= LJ.v * dt;
+          const y = Math.max(0, (LJ.d - touchD) * 0.055);
+          const lp = track.pointAt(track.wrapS(rwS0 + Math.max(0, Math.min(rwLen, LJ.d))), lane2), past = Math.max(0, LJ.d - rwLen);
+          lander.position.set(lp.x + dirX * past, y, lp.z + dirZ * past);
+          lander.rotation.set(y > 0 ? -0.05 : 0, Math.atan2(-dirX, -dirZ), 0);
+          lander.visible = true;
+          if (LJ.t > 34 || LJ.d < holdD) { LJ.on = false; lander.visible = false; }
+        }
         const thrust = J.state === 'hold' ? 0.35 : 1;
         for (const m of plumes) m.scale.set(1, 1, 0.6 + thrust * (1.4 + Math.sin(time * 40) * 0.1));
         plumeMat.opacity = 0.18 + thrust * 0.22;

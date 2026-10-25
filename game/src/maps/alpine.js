@@ -10,6 +10,7 @@ import { waterMaterial } from '../water.js';
 import { radialTexture } from '../textures.js';
 import { addWorldDetail } from '../detail.js';
 import { TUNNEL_STYLES } from '../tunnel.js';
+import { RoadHazards } from '../hazards.js';
 
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -453,8 +454,12 @@ export default {
       const path = [];
       for (let u = 300; u >= galW + 3; u -= 12) path.push([u, heightAt(chute.x + chute.ox * u, chute.z + chute.oz * u) + 1.5]);
       path.push([0, chute.y + galTop + 0.8], [-(galW + 2), chute.y + galTop + 0.4], [-(galW + 9), chute.y - 2], [-(galW + 20), chute.y - 14]);
-      avalanche = { pts, pos, seeds, n, path };
+      avalanche = { pts, pos, seeds, n, path, t0: -99, last: 0, want: false, spilled: true };
     }
+    // a wreck near the gallery (or just time) brings the avalanche down, and it spills drifts of
+    // snow across the road past the gallery's far end
+    const hazards = new RoadHazards(scene, track);
+    const onWreck = (sv) => { if (avalanche && gal && Math.abs(track.deltaS(sv, (gal.a + gal.b) / 2)) < 320) avalanche.want = true; };
     // --- cloud banks on the mountainsides --------------------------------------------------
     const ctex = cloudTexture(rand);
     const clouds = [];
@@ -568,6 +573,8 @@ export default {
     const v3 = new THREE.Vector3(), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
     return {
       landmark: { s: [dropI * track.step, ...landmarkS], range: 60 },
+      obstacles: hazards.list,
+      onWreck,
       update(dt, time) {
         for (const m of animated) m.uniforms.uTime.value = time;
         for (const b of balloons) {
@@ -590,10 +597,18 @@ export default {
         eagle.position.set(eagleAt[0] + Math.cos(ea) * 140, eagleY + Math.sin(time * 0.3) * 8, eagleAt[1] + Math.sin(ea) * 140);
         eagle.rotation.set(0, -ea, 0.35);
         eagle.scale.set(2.2, 2.2 * (0.3 + 0.7 * Math.max(0, Math.sin(time * 2.2)) * smooth(0.6, 1, Math.sin(time * 0.25))), 2.2);
+        hazards.update(dt);
         if (avalanche) {
-          // every 26 s: 9 s of snow pouring down
-          const ph = (time % 26) / 9, A = avalanche;
-          A.pts.visible = ph < 1;
+          // 9 s of snow pouring down: after a wreck nearby, or every 70 s anyway
+          const A = avalanche;
+          if (time < A.t0) { A.t0 = -99; A.last = time; } // a new race
+          if ((A.want || time - A.last > 70) && time - A.t0 > 9) { A.t0 = time; A.last = time; A.want = false; A.spilled = false; }
+          const ph = (time - A.t0) / 9;
+          if (!A.spilled && ph > 0.55) {
+            A.spilled = true;
+            for (let k = 0; k < 3; k++) hazards.spawn('snow', gal.b + 8 + k * 13 + rand() * 6, (rand() - 0.5) * 2 * (hw - 2.5));
+          }
+          A.pts.visible = ph >= 0 && ph < 1;
           if (A.pts.visible) {
             const P = A.path;
             for (let i = 0; i < A.n; i++) {

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { LAYOUTS } from './layouts.js';
 import { rng, instanced } from '../scenery.js';
 import { addWorldDetail } from '../detail.js';
-import { windowTextures, neonSignTexture, radialTexture } from '../textures.js';
+import { windowTextures, neonSignTexture, radialTexture, markText } from '../textures.js';
 import { Train } from '../train.js';
 
 const NEON = [0xff2d95, 0x19e3ff, 0xffd23f, 0x8a3cff, 0x3dff8a, 0xff6a2d];
@@ -44,7 +44,7 @@ function holoTexture(text, color) {
   g.fillText(text, 256, 128, 480);
   g.globalCompositeOperation = 'destination-out';
   for (let y = 0; y < 256; y += 6) g.fillRect(0, y, 512, 2); // scan lines
-  const t = new THREE.CanvasTexture(c);
+  const t = markText(new THREE.CanvasTexture(c));
   t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

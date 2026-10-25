@@ -18,6 +18,7 @@ import { recordRace, discoverSignature, unlockedPaints, unlockText, paintProgres
 import { SIGNATURE_KINDS } from './signatures.js';
 import { OnlineFlow } from './onlineMenu.js';
 import { TouchControls } from './touch.js';
+import { setTextMirror } from './textures.js';
 
 // setTimeout (not rAF) so loading also progresses when the window is hidden
 const IS_DESKTOP = /Electron/i.test(navigator.userAgent);
@@ -273,6 +274,7 @@ class Game {
       { key: 'master', label: 'MASTER VOLUME', value: bar(s.master) },
       { key: 'music', label: 'MUSIC VOLUME', value: bar(s.music) },
     );
+    items.push({ key: 'mirror', label: 'MIRRORED TRACKS', value: onOff(s.mirror !== false) });
     if (this.touch) items.push({ key: 'vibration', label: 'VIBRATION', value: onOff(s.vibration) });
     if (!IS_APP) items.push({ key: 'fullscreen', label: 'FULLSCREEN', value: onOff(document.fullscreenElement) });
     items.push({ key: 'back', label: 'BACK' });
@@ -319,6 +321,8 @@ class Game {
       s.steering = STEERING[(k + dir + STEERING.length) % STEERING.length];
       if (s.steering === 'tilt') TouchControls.askMotion(); // iOS: must happen inside this tap
       this.touch.setMode(s.steering);
+    } else if (key === 'mirror') {
+      s.mirror = s.mirror === false;
     } else if (key === 'vibration') {
       s.vibration = !s.vibration;
       if (s.vibration) this.buzz(40, 200);
@@ -412,7 +416,8 @@ class Game {
     let players = [{ carIndex: this.sel.car, paintIndex: this.sel.paint }];
     if (this.players > 1) players.push({ carIndex: this.sel2.car, paintIndex: this.sel2.paint });
     if (online) players = online.players;
-    this.session = new RaceSession(this, this.world, { players, net: online ? online.net : null, cars: online ? online.cars : this.carCount() });
+    this.session = new RaceSession(this, this.world, { players, net: online ? online.net : null, cars: online ? online.cars : this.carCount(), mirror: this.settings.mirror !== false });
+    this.setMirror(this.session.mirrored);
     this.ui.clearPopups();
     this.state = 'race';
     this.ui.show('hud');
@@ -421,12 +426,21 @@ class Game {
     this.slowTime = 0; this.autoDrops = 0; this.raceFps = { sum: 0, n: 0 };
     this.session.update(0.001);
     if (online ? online.random : this.randomPick()) this.session.popupAll(MAPS[this.raceTrack].name, 'RANDOM TRACK', 'hot');
+    if (this.session.mirrored) this.session.popupAll('MIRRORED', 'THE TRACK IS FLIPPED', 'hot');
     this.renderer.renderer.compile(this.world.scene, this.renderer.camera);
     this.ui.fade(false);
   }
 
+  // a mirrored race: the picture, the signs' text and the minimap are flipped (see Renderer)
+  setMirror(on) {
+    this.renderer.mirror = on;
+    setTextMirror(on);
+    if (this.minimaps) for (const m of this.minimaps) if (m.canvas) m.canvas.style.transform = on ? 'scaleX(-1)' : '';
+  }
+
   endSession() {
     this.pendingShot = null;
+    this.setMirror(false);
     if (!this.session) return;
     this.session.dispose();
     this.session = null;
@@ -728,13 +742,15 @@ class Game {
   }
 
   // phone vibration for player 1's knocks, crashes and takedowns (amount: like camera shake, 0-1.5)
-  haptic(H, amount) {
+  // strong: a long full-strength thud (big landings, landing on a car) that cuts in over any
+  // buzz still going
+  haptic(H, amount, strong = false) {
     if (!H || H.index !== 0 || !this.settings.vibration || this.input.lastDevice !== 'touch') return;
     const now = performance.now();
-    if (now < (this.buzzUntil || 0)) return;
-    const a = Math.min(1.5, amount), ms = Math.round(8 + a * 45);
+    if (now < (this.buzzUntil || 0) && !strong) return;
+    const a = Math.min(1.5, amount), ms = Math.round(strong ? 60 + a * 80 : 8 + a * 45);
     this.buzzUntil = now + ms + 40;
-    this.buzz(ms, Math.round(70 + Math.min(1, a) * 185));
+    this.buzz(ms, strong ? 255 : Math.round(70 + Math.min(1, a) * 185));
   }
 
   buzz(ms, strength = 180) {

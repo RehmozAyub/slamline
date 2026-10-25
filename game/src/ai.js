@@ -1,10 +1,15 @@
 // AI driver: follows a racing line with look-ahead steering, brakes for curvature, avoids
 // traffic, rubber-bands to the player, boosts on straights and sometimes rams the player.
-// Some laps it takes one of the track's shortcuts.
+// Some laps it takes one of the track's shortcuts. A style (config.js AI_STYLES) shapes it: a
+// bully rams far more, a sneak takes every shortcut, a clean racer steers clear of contact.
 import { wrapAngle } from './trackMath.js';
 
 export class AIDriver {
-  constructor(vehicle, track, { lane = 0, skill = 1, aggression = 0.3, refTopSpeed = null, shortcuts = [], shortcutChance = 0.4 } = {}) {
+  constructor(vehicle, track, { lane = 0, skill = 1, aggression = 0.3, refTopSpeed = null, shortcuts = [], shortcutChance = 0.4, style = null } = {}) {
+    this.style = style;
+    if (style === 'bully') aggression = 0.97;
+    if (style === 'sneak') { shortcutChance = 1; aggression = Math.min(aggression, 0.25); }
+    if (style === 'clean') aggression = 0;
     this.scs = shortcuts;
     this.scChance = shortcutChance;
     this.scPlans = new Map(); // shortcut -> take it this lap? (decided on the approach)
@@ -47,13 +52,28 @@ export class AIDriver {
       if (o.vehicle === v || o.vehicle.wrecked) continue;
       const dx = o.vehicle.x - v.x, dz = o.vehicle.z - v.z;
       const fwd = dx * fx + dz * fz, lat = dx * rx + dz * rz;
-      if (o.isPlayer && this.aggression > 0.5 && fwd > -3 && fwd < 6 && Math.abs(lat) < 6 && this.ramTimer < 0 && Math.random() < dt * this.aggression * 1.2) {
+      const ramRate = this.style === 'bully' ? 3.2 : 1.2, reach = this.style === 'bully' ? 9 : 6;
+      if (o.isPlayer && this.aggression > 0.5 && fwd > -3 && fwd < reach && Math.abs(lat) < reach && this.ramTimer < 0 && Math.random() < dt * this.aggression * ramRate) {
         this.ramTimer = 1.2; // side-swipe the player
         this.ramSide = Math.sign(lat);
       }
       if (fwd > 2 && fwd < 22 && Math.abs(lat) < 2.6 && o.vehicle.speed < speed + 2) {
         const otherLat = o.vehicle.lateral;
         desired = otherLat > 0 ? Math.max(-hw, otherLat - 4.2) : Math.min(hw, otherLat + 4.2);
+      }
+      // a clean racer gives anyone alongside room
+      if (this.style === 'clean' && Math.abs(fwd) < 9 && Math.abs(lat) < 4.6) {
+        desired = Math.max(-hw, Math.min(hw, v.lateral - Math.sign(o.vehicle.lateral - v.lateral || 1) * 4.8));
+      }
+    }
+    // boulders and drifts on the road ahead: the nearest lane clear of all of them
+    if (this.hazards && this.hazards.length) {
+      const ahead = this.hazards.filter((h) => { const d = track.deltaS(v.s, h.s); return d > 2 && d < 30 + speed * 1.4; });
+      const blocked = (lane) => ahead.some((h) => Math.abs(lane - h.lat) < h.r + 2.4);
+      if (ahead.length && blocked(desired)) {
+        let best = desired, bestD = Infinity;
+        for (let lane = -hw; lane <= hw + 1e-6; lane += 0.5) if (!blocked(lane) && Math.abs(lane - this.laneTarget) < bestD) { bestD = Math.abs(lane - this.laneTarget); best = lane; }
+        desired = best;
       }
     }
     let ramming = false;
@@ -68,7 +88,7 @@ export class AIDriver {
       for (const sc of this.scs) {
         const d = track.deltaS(v.s, sc.a); // + = fork ahead
         if (d > 220 || d < -60) { this.scPlans.delete(sc); continue; }
-        if (!this.scPlans.has(sc) && d > 60) this.scPlans.set(sc, Math.random() < this.scChance * (sc.fence ? 0.6 : 1));
+        if (!this.scPlans.has(sc) && d > 60) this.scPlans.set(sc, this.style === 'sneak' || Math.random() < this.scChance * (sc.fence ? 0.6 : 1));
         if (this.scPlans.get(sc) && d < 110) {
           desired = sc.side * (track.halfWidth - 2.6);
           if (d < 20) { route = sc.path; rs = sc.path.project(v.x, v.z, -1, this.pq).s; lane = 0; }
