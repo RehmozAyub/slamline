@@ -11,7 +11,7 @@ import { buildCar, disposeCar } from './carModel.js';
 import { Effects } from './fx.js';
 import { RaceTracker } from './race.js';
 import { BoostSystem, RULES, isNearMiss, isDrafting, classifyImpact, isPushTakedown, isWallCrash } from './burnout.js';
-import { CARS, PAINTS, BASE_PAINTS, AI_NAMES, LAPS, CAR_COUNT, clampCars } from './config.js';
+import { CARS, PAINTS, BASE_PAINTS, AI_NAMES, AI_STYLES, STYLE_TAG, LAPS, CAR_COUNT, clampCars } from './config.js';
 import { wrapAngle } from './trackMath.js';
 import { PickupState, layoutPickups, strikeTarget, stepShot, inBox, aiWantsPower, POWERS, PICKUP_RULES, AI_POWER } from './powerups.js';
 import { PickupVisuals } from './pickups.js';
@@ -24,7 +24,9 @@ import { FenceProps } from './props.js';
 import { RivalMarkers } from './markers.js';
 
 // what a human sees when a power-up (or a rival) wrecks them
-const VICTIM_LABEL = { 'TAKEDOWN!': 'TAKEN OUT', 'RICOCHET TAKEDOWN': 'RICOCHETED', SHOCKWAVE: 'SHOCKWAVED', 'LANDED ON': 'CRUSHED' };
+const VICTIM_LABEL = { 'TAKEDOWN!': 'TAKEN OUT', 'RICOCHET TAKEDOWN': 'RICOCHETED', SHOCKWAVE: 'SHOCKWAVED', 'LANDED ON': 'CRUSHED', 'AIR STRIKE': 'BLINDSIDED', GRINDER: 'GROUND DOWN', SHUNT: 'SHUNTED' };
+// named takedowns pay more boost than a plain one
+const TAKEDOWN_BONUS = { 'AIR STRIKE': 1.5, 'LANDED ON': 1.5, GRINDER: 1.3, SHUNT: 1.15 };
 const CAR_HIGH = 1.7; // a car this far (or less) over another is touching it
 
 const CIRCLE_R = 1.05;
@@ -55,10 +57,13 @@ export class RaceSession {
     this.shortcuts = world.shortcuts || null; // ShortcutSet
     this.rails = world.rails || []; // loops, corkscrews, helixes (rail.js)
     this.jumps = world.jumps || []; // gaps to fly (features.js)
+    this.wormholes = (world.tunnels || []).filter((t) => t.style === 'wormhole');
+    this.drawbridges = this.jumps.filter((j) => j.spec.sign === 'DRAWBRIDGE');
     this.banks = world.banks || []; // wall-rides (features.js)
     this.trains = world.trains || []; // trains over level crossings: { train, s, tc, w }
     this.ice = world.ice || []; // frozen stretches of road (features.js)
     this.blasts = world.blasts || []; // jet blast behind a jet taking off (Skyport): { active, x, y, z, dx, dz }
+    this.obstacles = world.obstacles || []; // boulders and snow drifts on the road (hazards.js)
     this.landmark = world.landmark || null;
     this.hairpin = hairpinS(this.track);
     this.tmpP = {}; this.tmpQ = {};
@@ -67,6 +72,8 @@ export class RaceSession {
     const humanDefs = opts.players || [{ carIndex: opts.carIndex, paintIndex: opts.paintIndex }];
     // online: { role: 'host' | 'guest', me: player id, seed }; players[i] = { id, name, carIndex, paintIndex }
     const netOpts = opts.net || null;
+    // now and then a race is mirrored (Settings: MIRRORED TRACKS); online, everyone's roll matches
+    this.mirrored = !!opts.mirror && (netOpts ? mulberry32((netOpts.seed ^ 0x5f3759df) >>> 0)() : Math.random()) < 0.3;
     this.online = !!netOpts;
     this.role = netOpts ? netOpts.role : null;
     this.me = netOpts ? netOpts.me : null; // this device's player id online
@@ -134,7 +141,7 @@ export class RaceSession {
         id: this.online ? (isPlayer ? (local ? 'player' : hd.id) : `ai${ai}`) : isPlayer ? (hi === 0 ? 'player' : 'player2') : `ai${ai}`,
         name: isPlayer ? (this.split ? `P${hi + 1}` : this.online ? hd.name || (local ? 'YOU' : 'FRIEND') : 'YOU') : names[ai],
         isPlayer, vehicle: v, model, spec, paint, human: null, owner, remote, index: slot,
-        ai: isPlayer || remote ? null : new AIDriver(v, this.track, { lane: lat * 0.6, skill: aiSkill[ai % aiSkill.length], aggression: aiAggro[ai % aiAggro.length], refTopSpeed: refTop, shortcuts: this.shortcuts ? this.shortcuts.list : [] }),
+        ai: isPlayer || remote ? null : new AIDriver(v, this.track, { lane: lat * 0.6, skill: aiSkill[ai % aiSkill.length], aggression: aiAggro[ai % aiAggro.length], refTopSpeed: refTop, shortcuts: this.shortcuts ? this.shortcuts.list : [], style: AI_STYLES[names[ai]] || null }),
         controls: { steer: 0, throttle: 0, brake: 0, handbrake: false, boost: false },
         power: null, powerTime: 0,
         pushedAt: -99, pushedBy: null, lastContact: -99, prevFwd: [0, 0], respawn: 0, mul: 1,
@@ -317,11 +324,14 @@ export class RaceSession {
       }
       const H = c.human;
       if (H && this.state === 'racing' && !H.finished && !this.autopilot) {
-        const ctl = H.assistOn ? H.assist.apply(v, H.input) : H.input;
+        // a mirrored race is drawn flipped, so steering is flipped to match what the player sees
+        const inp = this.mirrored ? { ...H.input, steer: -H.input.steer } : H.input;
+        const ctl = H.assistOn ? H.assist.apply(v, inp) : inp;
         c.controls = { ...ctl, boost: H.boost.boosting, draft: H.drafting };
         c.mul = 1;
       } else {
         if (!c.ai) c.ai = new AIDriver(v, this.track, { lane: v.lateral, skill: 0.8, aggression: 0, shortcuts: this.shortcuts ? this.shortcuts.list : [] });
+        c.ai.hazards = this.obstacles;
         const me = this.race.byId.get(c.id);
         const target = H ? null : this.nearestHuman(v).car;
         const ctl = c.ai.think(dt, this.cars, target ? target.vehicle : null, H ? me.progress : hp, me.progress);
@@ -353,6 +363,13 @@ export class RaceSession {
       this.collide();
     }
     for (const c of this.cars) if (c.vehicle.events && c.vehicle.events.length) this.onAirEvents(c);
+    if (racing) this.setPieceSounds();
+    if (this.world.smash && racing) this.world.smash.update(dt, this.cars, (c, it) => this.onSmash(c, it));
+    if (this.obstacles.length && racing) this.hitObstacles(dt);
+    for (const H of this.humans) if (H.smashT > 0 && (H.smashT -= dt) <= 0 && H.smashN) {
+      this.scoreEvent(H, H.smashN > 1 ? `SMASH ×${H.smashN}` : 'SMASH', H.smashGain);
+      H.smashN = 0; H.smashGain = 0;
+    }
     this.fences.update(dt, this.cars);
 
     for (const c of this.cars) {
@@ -423,6 +440,34 @@ export class RaceSession {
     }
   }
 
+  // the set pieces' own sounds, for the players on this device: the wormhole roars round
+  // them, the raised drawbridge groans as they come up to it, the ski jump's crowd roars as
+  // they fly off it
+  setPieceSounds() {
+    const audio = this.game.audio, T = this.track;
+    let roar = 0;
+    for (const H of this.humans) {
+      const v = H.car.vehicle, s = v.s, prev = H.soundS ?? s;
+      H.soundS = s;
+      if (v.wrecked || v.onSC) { H.wasAir = false; continue; }
+      for (const w of this.wormholes) {
+        const into = T.deltaS(w.a, s), len = T.deltaS(w.a, w.b);
+        const k = into < -60 || into > len + 40 ? 0 : into < 0 ? 1 + into / 60 : into > len ? 1 - (into - len) / 40 : 1;
+        roar = Math.max(roar, k * Math.min(1, 0.4 + v.speed / 80));
+      }
+      for (const j of this.drawbridges) {
+        const mark = T.wrapS(j.sRamp - 70);
+        if (T.deltaS(mark, prev) < 0 && T.deltaS(mark, s) >= 0 && T.deltaS(mark, s) < 20 && !(this.time < H.creakAt + 4)) { audio.creak(0.9); H.creakAt = this.time; }
+      }
+      if (v.air && !H.wasAir) {
+        const j = jumpAt(this.jumps, s, 20);
+        if (j && j.spec.sign === 'SKI JUMP' && !(this.time < H.cheerAt + 4)) { audio.cheer(0.9); H.cheerAt = this.time; }
+      }
+      H.wasAir = !!v.air;
+    }
+    audio.roar(roar);
+  }
+
   // fell short of a jump: down into the gap, and back on the road past it
   checkGap(c) {
     const v = c.vehicle, j = jumpAt(this.jumps, v.s);
@@ -431,6 +476,50 @@ export class RaceSession {
     if (c.human) this.crashHuman(c.human, 'WIPED OUT', -Math.sin(v.heading), -Math.cos(v.heading));
     else { v.crash(0, 0, 0.6); c.respawn = 2.6; this.fx.explosion(v.x, v.airY + 0.6, v.z, v.vx, v.vz, c.paint, v.airY); }
     c.crashS = this.track.wrapS(j.sLand + 12);
+  }
+
+  // boulders wreck a car that hits them fast (a slow one is stopped); snow drifts bog it down
+  hitObstacles(dt) {
+    for (const c of this.cars) {
+      const v = c.vehicle;
+      if (c.remote || v.wrecked || v.ride || v.onSC) continue;
+      for (const h of this.obstacles) {
+        if (!h.active) continue;
+        const dx = v.x - h.x, dz = v.z - h.z, d = Math.hypot(dx, dz), reach = h.r + 1;
+        if (d > reach || (v.air ? v.airY : v.y) > h.y + h.r * (h.kind === 'rock' ? 1.3 : 0.5)) continue;
+        if (h.kind === 'snow') {
+          const k = Math.max(0, 1 - dt * 2.4);
+          v.vx *= k; v.vz *= k;
+          if (Math.random() < dt * 20) this.fx.tyreSmoke(v.x, v.y, v.z, v.vx, v.vz, 0.8);
+          continue;
+        }
+        const sp = v.speed, nx = dx / (d || 1), nz = dz / (d || 1);
+        if (sp > 16) {
+          if (c.human) this.crashHuman(c.human, 'ROCKFALL', -nx, -nz);
+          else { c.crashS = v.s; v.crash(-nx, -nz, 1); c.respawn = 2.8; this.fx.explosion(v.x, v.y + 0.6, v.z, v.vx, v.vz, c.paint, v.y); this.noteWreck(v); }
+        } else {
+          v.x = h.x + nx * reach; v.z = h.z + nz * reach;
+          v.vx *= 0.4; v.vz *= 0.4;
+        }
+      }
+    }
+  }
+
+  // a car wrecked at v.s: the map may answer (the avalanche comes down ...)
+  noteWreck(v) { if (this.world.onWreck) this.world.onWreck(v.s); }
+
+  // a car sent a prop flying (smash.js): a bit of boost for a player, counted up into one
+  // SMASH ×n popup per run of them
+  onSmash(c, it) {
+    const v = c.vehicle, vol = c.human ? 0.5 : this.audibility(v) * 0.5;
+    if (vol > 0.04) this.game.audio.impact(0.18 + vol * 0.2);
+    if (this.fx.sparks) this.fx.sparks(it.x, it.y + 0.6, it.z, v.vx * 0.3, v.vz * 0.3, 5, 0.4);
+    const H = c.human;
+    if (!H || this.state !== 'racing') return;
+    H.smashGain = (H.smashGain || 0) + H.boost.add(3);
+    H.smashN = (H.smashN || 0) + 1;
+    H.smashT = 0.7;
+    this.game.haptic(H, 0.25);
   }
 
   // smashed through a fence into a hidden shortcut
@@ -453,6 +542,7 @@ export class RaceSession {
       if (e.type !== 'land') continue;
       if (e.impact > 6) { this.fx.tyreSmoke(v.x, v.y, v.z, v.vx, v.vz, 1.2); if (H) this.shake(H, Math.min(0.6, e.impact / 25)); }
       if (!H || e.airTime < 0.35) continue;
+      if (e.airTime > 1) this.game.haptic(H, Math.min(1.5, e.airTime * 0.6), true);
       const air = Math.round(e.airTime * 10) / 10;
       if (e.trick && e.clean) {
         const name = { roll: 'BARREL ROLL', spin: 'FLAT SPIN', donut: 'AERIAL DONUT' }[e.trick];
@@ -1029,14 +1119,14 @@ export class RaceSession {
     if (attacker.remote && attacker.isPlayer) return; // the other player rammed an AI: their device decides
     if (attacker.human) {
       const kind = classifyImpact({ closing, playerShare: share });
-      if (kind === 'takedown') this.takedown(victim, nx * dir, nz * dir, 'TAKEDOWN!', false, attacker);
+      if (kind === 'takedown') this.takedown(victim, nx * dir, nz * dir, this.takedownName(attacker, victim, nx * dir, nz * dir), false, attacker);
       else if (kind === 'push') { victim.pushedAt = this.time; victim.pushedBy = attacker; }
     } else {
       // an AI rammed a human: 'playerWrecked' when the AI supplied almost all the closing speed
       const kind = classifyImpact({ closing, playerShare: 1 - share }, victim.human.assistOn ? ASSIST_RULES : RULES);
       if (kind === 'playerWrecked') {
         attacker.kills = (attacker.kills || 0) + 1;
-        this.crashHuman(victim.human, 'TAKEN OUT', nx * dir, nz * dir, attacker);
+        this.crashHuman(victim.human, VICTIM_LABEL[this.takedownName(attacker, victim, nx * dir, nz * dir)], nx * dir, nz * dir, attacker);
         if (this.net && attacker.remote) this.net.credit(attacker, victim, 'TAKEN OUT', true);
       }
     }
@@ -1062,8 +1152,23 @@ export class RaceSession {
       }
     }
     if (!flying && c.pushedBy && c.pushedBy !== c && isPushTakedown({ sincePush: this.time - c.pushedAt, wallSpeed: hit.vn })) {
-      this.takedown(c, hit.nx, hit.nz, 'TAKEDOWN!', false, c.pushedBy);
+      this.takedown(c, hit.nx, hit.nz, 'GRINDER', false, c.pushedBy); // shoved into the wall
     }
+  }
+
+  // what kind of takedown: hit from the air, pinned against the wall, rammed from behind, or a
+  // plain one (n: the push direction, from the attacker into the victim)
+  takedownName(attacker, victim, nx, nz) {
+    const A = attacker.vehicle, V = victim.vehicle, hw = this.track.halfWidth;
+    if (A.air) return 'AIR STRIKE';
+    if (!V.onSC && Math.abs(V.lateral) > hw - 2) {
+      const p = this.track.pointAt(V.s, 0, this.tmpP2 || (this.tmpP2 = {}));
+      const out = (nx * p.rx + nz * p.rz) * Math.sign(V.lateral); // pushing it toward its wall
+      if (out > 0.45) return 'GRINDER';
+    }
+    const fx = Math.sin(V.heading), fz = Math.cos(V.heading);
+    if (nx * fx + nz * fz > 0.8 && A.vx * fx + A.vz * fz > 15) return 'SHUNT';
+    return 'TAKEDOWN!';
   }
 
   // Wreck car `c`; car `byCar` caused it (a human gets the takedown credited).
@@ -1082,6 +1187,7 @@ export class RaceSession {
       if (byCar && !byCar.human && label !== 'TAKEDOWN!') c.human.shieldUntil = this.time + AI_POWER.humanShield;
     } else {
       c.crashS = v.s;
+      this.noteWreck(v);
       v.crash(dirX, dirZ, 1.3);
       c.respawn = 3.4;
       this.fx.explosion(v.x, v.y + 0.6, v.z, v.vx, v.vz, c.paint, v.y);
@@ -1117,7 +1223,7 @@ export class RaceSession {
     const payback = by.rival === c;
     if (payback) { by.rival = null; by.paybacks++; }
     const sig = this.signatureFor(c, by.car);
-    let gained = by.boost.event(RULES.takedownGain);
+    let gained = by.boost.event(RULES.takedownGain * (TAKEDOWN_BONUS[label] ?? 1));
     if (payback) gained += by.boost.add(RULES.takedownGain * 0.7);
     if (sig) gained += by.boost.add(15);
     if (sig) this.game.onSignature(by.index, sig, this.def.id);
@@ -1129,6 +1235,7 @@ export class RaceSession {
     if (quiet) return;
     by.flash = 0.5;
     this.shake(by, 1);
+    if (label === 'LANDED ON') this.game.haptic(by, 1.5, true);
     if (this.online) return; // online: no slow motion, and the camera stays on the road
     this.slowmo = this.split ? 0.8 : 1.4;
     by.rig.startCrashCam(v, this.split ? 1.0 : 1.4, Math.random() < 0.5 ? 1 : -1);
@@ -1146,6 +1253,7 @@ export class RaceSession {
     const car = H.car, v = car.vehicle;
     if (v.wrecked || v.ride) return;
     car.crashS = v.s;
+    this.noteWreck(v);
     v.crash(dirX, dirZ, 1);
     car.respawn = 2.4;
     H.boost.resetChain();
@@ -1155,7 +1263,8 @@ export class RaceSession {
     this.fx.explosion(v.x, v.y + 0.6, v.z, v.vx, v.vz, car.paint, v.y);
     this.game.audio.crash();
     this.game.haptic(H, 1.5);
-    this.popup(label, byCar ? `by ${byCar.name}${grudge ? ' · NEW RIVAL' : ''}` : 'CRASH', 'bad', H);
+    const tag = byCar && byCar.ai && byCar.ai.style ? ` ${STYLE_TAG[byCar.ai.style]}` : '';
+    this.popup(label, byCar ? `by ${byCar.name}${tag}${grudge ? ' · NEW RIVAL' : ''}` : 'CRASH', 'bad', H);
     this.slowMo(this.split ? 0.8 : 1.8);
     H.flash = 0.35;
     H.rig.startCrashCam(v, this.split ? 1.2 : 1.8, 1);

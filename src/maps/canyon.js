@@ -9,6 +9,7 @@ import { rng, colored, merge, instanced, scatter } from '../scenery.js';
 import { waterMaterial } from '../water.js';
 import { radialTexture } from '../textures.js';
 import { Train } from '../train.js';
+import { RoadHazards } from '../hazards.js';
 
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const BANDS = [0xb4532e, 0xc86a3a, 0x9a4428, 0xd88a52, 0xa84a2c, 0xe0a070].map((h) => new THREE.Color(h));
@@ -536,11 +537,32 @@ export default {
 
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v3 = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
     const fc = {}, pj = {};
+    // rockfall in the slot canyon: as a player comes up to it, boulders come off the wall above
+    // the wall-ride and land on the road ahead of them (now and then, not every lap)
+    const hazards = new RoadHazards(scene, track), slot = banks[0] || null, rq = {};
+    const fall = { last: -99, at: slot ? track.wrapS(slot.s0 - 18) : 0 };
     return {
       landmark: { s: [track.length * 0.35], range: 70 }, // the water tower
       trains: trainEntry ? [trainEntry] : [],
-      update(dt, time) {
+      obstacles: hazards.list,
+      update(dt, time, camera, focus) {
         for (const mat of animated) mat.uniforms.uTime.value = time;
+        hazards.update(dt);
+        if (time < fall.last) fall.last = -99; // a new race
+        if (slot && focus && time - fall.last > 45) {
+          track.project(focus.x, focus.z, rq.idx ?? -1, rq);
+          const ahead = track.deltaS(rq.s, fall.at);
+          if (ahead > 150 && ahead < 320) {
+            fall.last = time;
+            // two of three lanes blocked, staggered: there is always a way through
+            const lanes = [-6.5, 0, 6.5], free = Math.floor(rand() * 3);
+            lanes.filter((_, k) => k !== free).forEach((lane, k) => {
+              const sv = fall.at + k * 11 + (rand() - 0.5) * 4, lat = lane + (rand() - 0.5) * 1.2;
+              const top = track.pointAt(track.wrapS(sv), slot.side * (hw + 6));
+              hazards.spawn('rock', sv, lat, { x: top.x, y: top.y + 38, z: top.z });
+            });
+          }
+        }
         if (trainEntry) {
           const tr = trainEntry.train;
           tr.setTime(time);

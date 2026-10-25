@@ -218,8 +218,29 @@ export class Renderer {
     this.height = vh * pr;
   }
 
+  // a mirrored race: the world and each camera are reflected across x = 0 just for the draw,
+  // so the picture comes out flipped left to right while the game itself runs as usual
+  flipView(cam) {
+    cam.position.x = -cam.position.x;
+    cam.quaternion.set(cam.quaternion.x, -cam.quaternion.y, -cam.quaternion.z, cam.quaternion.w);
+    cam.updateMatrixWorld();
+  }
+
   render(time) {
     if (!this.scene) return;
+    if (this.mirror) {
+      this.scene.scale.x = -1;
+      for (let i = 0; i < this.viewCount; i++) this.flipView(this.cameras[i]);
+    }
+    try { this.drawViews(time); } finally {
+      if (this.mirror) {
+        this.scene.scale.x = 1;
+        for (let i = 0; i < this.viewCount; i++) this.flipView(this.cameras[i]);
+      }
+    }
+  }
+
+  drawViews(time) {
     const r = this.renderer;
     const w = window.innerWidth, h = window.innerHeight;
     if (this.viewCount === 1) {

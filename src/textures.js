@@ -7,6 +7,17 @@ function canvas(w, h) {
   return [c, c.getContext('2d')];
 }
 
+// Textures with words on them. In a mirrored race the whole world is drawn flipped, so these
+// are flipped back (u -> 1 - u) to stay readable (setTextMirror).
+const TEXT_TEXTURES = new Set();
+export function markText(t) { TEXT_TEXTURES.add(t); if (textMirrored) mirrorTex(t, true); return t; }
+let textMirrored = false;
+function mirrorTex(t, on) { t.repeat.x = on ? -1 : 1; t.offset.x = on ? 1 : 0; }
+export function setTextMirror(on) {
+  textMirrored = on;
+  for (const t of TEXT_TEXTURES) mirrorTex(t, on);
+}
+
 function tex(c, { repeat = true, srgb = true, aniso = 8 } = {}) {
   const t = new THREE.CanvasTexture(c);
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -183,7 +194,7 @@ export function textTexture(text, { w = 1024, h = 256, bg = '#0b0b10', fg = '#ff
   g.textBaseline = 'middle';
   g.fillStyle = fg;
   g.fillText(text, w / 2, h / 2 + 6);
-  return tex(c, { repeat: false });
+  return markText(tex(c, { repeat: false }));
 }
 
 // Simple vertical gradient texture for skies behind billboards / neon signs.
@@ -202,7 +213,7 @@ export function neonSignTexture(text, color) {
   g.fillStyle = '#fff';
   g.fillText(text, 256, 84);
   g.strokeRect(10, 10, 492, 140);
-  return tex(c, { repeat: false });
+  return markText(tex(c, { repeat: false }));
 }
 
 export function kerbTexture(a = '#d01818', b = '#f2f2f2') {

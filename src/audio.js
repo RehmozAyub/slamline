@@ -280,7 +280,87 @@ export class AudioEngine {
 
   silenceEngine() {
     if (!this.ctx) return;
+    this.roar(0);
     for (let i = 0; i < this.engines.length; i++) this.updateEngine({ speed: 0, top: 1, throttle: 0, boost: 0, slip: 0, scraping: 0, active: false }, i);
+  }
+
+  // --- set pieces ---------------------------------------------------------------
+  // the wormhole's roar: a looping bed (filtered noise over a low saw, wobbling) held at
+  // `level` (0..1) every frame; it stops itself once it has been quiet a while
+  roar(level) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    let b = this.roarBed;
+    if (!b) {
+      if (level < 0.01) return;
+      const src = this.noise(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      f.type = 'lowpass'; f.frequency.value = 300; f.Q.value = 4;
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 36;
+      const og = ctx.createGain(); og.gain.value = 0.35;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.7;
+      const lg = ctx.createGain(); lg.gain.value = 220;
+      lfo.connect(lg); lg.connect(f.frequency);
+      src.connect(f); o.connect(og); og.connect(f); f.connect(g); g.connect(this.sfx);
+      g.gain.value = 0;
+      src.start(); o.start(); lfo.start();
+      b = this.roarBed = { src, o, lfo, f, g, quiet: 0 };
+    }
+    b.g.gain.setTargetAtTime(level * 0.55, t, 0.15);
+    b.f.frequency.setTargetAtTime(260 + level * 900, t, 0.2);
+    b.o.frequency.setTargetAtTime(32 + level * 30, t, 0.2);
+    b.quiet = level < 0.01 ? b.quiet || t : 0;
+    if (b.quiet && t - b.quiet > 2) { b.src.stop(); b.o.stop(); b.lfo.stop(); this.roarBed = null; }
+  }
+
+  // an old drawbridge's iron groan (two stick-slip saws), then a clank of chain
+  creak(vol = 1) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    for (let k = 0; k < 2; k++) {
+      const t0 = t + k * 0.55, base = 70 + k * 25;
+      const o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(base, t0);
+      for (let i = 1; i <= 12; i++) o.frequency.setValueAtTime(base * (1 + i * 0.04) * (0.92 + Math.random() * 0.16), t0 + i * 0.05);
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 650 + k * 200; f.Q.value = 6;
+      const g = ctx.createGain();
+      o.connect(f); f.connect(g); g.connect(this.sfx);
+      this.env(g, t0, 0.08, 0.35 * vol, 0.55);
+      o.start(t0); o.stop(t0 + 0.8);
+    }
+    for (const fr of [1150, 1720, 2430]) {
+      const m = ctx.createOscillator(); m.type = 'triangle'; m.frequency.value = fr;
+      const mg = ctx.createGain();
+      m.connect(mg); mg.connect(this.sfx);
+      this.env(mg, t + 1.15, 0.002, 0.05 * vol, 0.35);
+      m.start(t + 1.15); m.stop(t + 1.6);
+    }
+  }
+
+  // a grandstand roaring as a car flies: three bands of noise for the mass of voices, swelling
+  // and fading, with a few whoops sliding up through it
+  cheer(vol = 1, dur = 2.6) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    for (const [fr, q, peak] of [[700, 1.2, 0.22], [1400, 1.5, 0.16], [2600, 2, 0.08]]) {
+      const n = this.noise(false), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      f.type = 'bandpass'; f.frequency.value = fr; f.Q.value = q;
+      n.connect(f); f.connect(g); g.connect(this.sfx);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak * vol, t + 0.5);
+      g.gain.setValueAtTime(peak * vol, t + dur * 0.5);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      n.start(t, Math.random()); n.stop(t + dur + 0.1);
+    }
+    for (let k = 0; k < 6; k++) {
+      const t0 = t + 0.1 + Math.random() * 1.2, f0 = 300 + Math.random() * 200;
+      const o = ctx.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f0 * 1.6, t0 + 0.3);
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 1.5;
+      const g = ctx.createGain();
+      o.connect(f); f.connect(g); g.connect(this.sfx);
+      this.env(g, t0, 0.04, 0.03 * vol, 0.35);
+      o.start(t0); o.stop(t0 + 0.5);
+    }
   }
 
   env(node, t, a, peak, dec) {
