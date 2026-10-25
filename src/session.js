@@ -24,7 +24,8 @@ import { FenceProps } from './props.js';
 import { RivalMarkers } from './markers.js';
 
 // what a human sees when a power-up (or a rival) wrecks them
-const VICTIM_LABEL = { 'TAKEDOWN!': 'TAKEN OUT', 'RICOCHET TAKEDOWN': 'RICOCHETED', SHOCKWAVE: 'SHOCKWAVED' };
+const VICTIM_LABEL = { 'TAKEDOWN!': 'TAKEN OUT', 'RICOCHET TAKEDOWN': 'RICOCHETED', SHOCKWAVE: 'SHOCKWAVED', 'LANDED ON': 'CRUSHED' };
+const CAR_HIGH = 1.7; // a car this far (or less) over another is touching it
 
 const CIRCLE_R = 1.05;
 const CIRCLE_OFF = 1.2;
@@ -935,9 +936,11 @@ export class RaceSession {
         const moveA = !cars[i].remote, moveB = !cars[j].remote; // online: the other device moves its own cars
         if (!moveA && !moveB) continue;
         if (A.ghost > 0 || B.ghost > 0) continue;
-        if (A.air || B.air || Math.abs(A.y - B.y) > 1.6) continue; // in the air off a ramp: no contact
         if (A.ride || B.ride) continue; // on a loop: railContacts handles it
         if (A.wrecked && B.wrecked) continue;
+        // heights: a car in the air off a ramp can clear one below it, or land on it
+        const yA = A.air ? A.airY : A.y, yB = B.air ? B.airY : B.y, dy = yA - yB;
+        if (Math.abs(dy) > (A.air || B.air ? CAR_HIGH + 0.4 : 1.6)) continue;
         const dx0 = B.x - A.x, dz0 = B.z - A.z;
         if (dx0 * dx0 + dz0 * dz0 > 36) continue;
         let best = null;
@@ -952,6 +955,12 @@ export class RaceSession {
           }
         }
         if (!best) continue;
+        // one coming down out of the air onto the other: the one underneath is flattened
+        const topA = A.air && !B.air && dy > 0.5, topB = B.air && !A.air && dy < -0.5;
+        if ((topA || topB) && !(topA ? A : B).wrecked) {
+          if ((topA ? A : B).vy < 2) this.landOn(topA ? cars[i] : cars[j], topA ? cars[j] : cars[i], best);
+          continue;
+        }
         const { pen, nx, nz } = best;
         const mA = A.wrecked ? 3 : A.mass, mB = B.wrecked ? 3 : B.mass;
         const tot = mA + mB;
@@ -972,6 +981,25 @@ export class RaceSession {
         this.onCarHit(cars[i], cars[j], closing, nx, nz, best.cx, best.cz, pA, pB);
       }
     }
+  }
+
+  // car `top` came down on `low` from a jump: `low` is crushed (a takedown for `top`) and
+  // `top` bounces off it and flies on
+  landOn(top, low, at) {
+    const T = top.vehicle, L = low.vehicle;
+    const moveT = !top.remote;
+    if (moveT) {
+      T.airY = Math.max(T.airY, L.y + CAR_HIGH);
+      T.vy = Math.max(T.vy, 4);
+      T.vx *= 0.96; T.vz *= 0.96;
+    }
+    const y = L.y + 1.2;
+    this.fx.sparks(at.cx, y, at.cz, T.vx, T.vz, 30, 1.6);
+    if (L.wrecked || this.state !== 'racing') return;
+    if (top.remote && top.isPlayer) return; // their device decides
+    const dirX = Math.sin(T.heading), dirZ = Math.cos(T.heading);
+    if (this.net && top.isPlayer && low.isPlayer) { this.net.claimHit(top, low, 'takedown', dirX, dirZ, Math.abs(T.vy) + 10); return; }
+    this.takedown(low, dirX, dirZ, 'LANDED ON', !top.human && !low.human, top);
   }
 
   onCarHit(ca, cb, closing, nx, nz, cx, cz, pA, pB) {

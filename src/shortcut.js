@@ -421,9 +421,13 @@ function airStep(v, ground, dt, ramp, tangent = null) {
       v.trick = null;
       v.yawRate = 0;
       v.trickKind = ramp && ramp.half ? 'roll' : 'spin';
+      // where it will come down: over a jump's gap the ground below is the pit, so tricks are
+      // timed to the road on the far side (about the lip's height less the kicker, a bit higher
+      // to be safe: the trick finishes a touch early rather than late)
+      v.landGround = ramp && ramp.gap ? last - ramp.h + 1 : ground;
       // drifting into the lip (or drift tapped just before it) starts the trick
       const steering = v.inHandbrake && Math.abs(v.inSteer) > 0.3;
-      if (steering || v.drifting || v.hbRecent > 0) startTrick(v, ground, steering ? v.inSteer : v.driftDir || -Math.sign(v.slip) || 1);
+      if (steering || v.drifting || v.hbRecent > 0) startTrick(v, v.landGround, steering ? v.inSteer : v.driftDir || -Math.sign(v.slip) || 1);
     } else {
       v.vyGround = vyG;
       v.y = ground;
@@ -434,7 +438,8 @@ function airStep(v, ground, dt, ramp, tangent = null) {
     v.airY += v.vy * dt;
     v.airTime += dt;
     // a late trick: drift + steer early in the jump still has time to come round
-    if (!v.trick && v.airTime < AIR.lateTrick && v.inHandbrake && Math.abs(v.inSteer) > 0.3) startTrick(v, ground, v.inSteer);
+    const landAt = Math.max(ground, v.landGround ?? ground);
+    if (!v.trick && v.airTime < AIR.lateTrick && v.inHandbrake && Math.abs(v.inSteer) > 0.3) startTrick(v, landAt, v.inSteer);
     if (tangent) {
       // arcade air control: the flight eases round to follow the road below, aiming back
       // toward its middle so a car never flies into the barriers
@@ -451,7 +456,7 @@ function airStep(v, ground, dt, ramp, tangent = null) {
     if (tr) {
       // keep drift held through the jump and a flat spin becomes a double: the aerial donut
       if (tr.kind === 'spin' && tr.target < Math.PI * 3 && v.inHandbrake && v.airTime > AIR.donutHold) {
-        const left = timeToGround(v, ground);
+        const left = timeToGround(v, landAt);
         if (left > AIR.donutTime) { tr.target = Math.PI * 4; tr.rate = (tr.target - tr.angle) / (left * 0.82); }
       }
       tr.angle = Math.min(tr.target, tr.angle + tr.rate * dt);
@@ -557,7 +562,9 @@ export function constrainOnRoads(v, track, set, dt = 1 / 120, tmpP = {}, tmpQ = 
     const sp = Math.hypot(v.vx, v.vz);
     if (sp < j.minSpeed) { v.vx *= j.minSpeed / sp; v.vz *= j.minSpeed / sp; }
   }
-  airStep(v, v.y + (j ? j.lift(v.s) : 0), dt, j, j ? p : null);
+  // (air control follows the road for the whole flight: a fast car can still be in the air well
+  // past the jump, where the road bends)
+  airStep(v, v.y + (j ? j.lift(v.s) : 0), dt, j, j || v.air ? p : null);
   if (j && !v.air && j.onRamp(v.s)) v.pitch -= Math.atan(j.slope(v.s)); // nose up the kicker
   return hit;
 }
