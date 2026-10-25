@@ -418,13 +418,13 @@ function rampGuides(path, r, shw, style) {
     m.renderOrder = 2;
     group.add(m);
   }
-  const board = new THREE.MeshBasicMaterial({ map: textTexture('▲ JUMP ▲', { accent: style.accent ?? '#ff2d55', bg: '#ffd400', fg: '#111111', font: 'italic 900 150px Bahnschrift, "Segoe UI", sans-serif' }), toneMapped: false, side: THREE.DoubleSide });
+  const board = new THREE.MeshBasicMaterial({ map: hazardTexture('jump'), toneMapped: false, side: THREE.DoubleSide });
   const postMat = new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.6, metalness: 0.5 });
   const sides = r.half ? [r.half] : [-1, 1];
   for (const sd of sides) {
     const p = path.pointAt(r.u0 - 22, sd * (shw + 1.6));
     const sign = new THREE.Group();
-    const b = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.75), board);
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4 * (208 / 1024)), board);
     b.position.y = 1.9;
     sign.add(b);
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.9, 0.1), postMat);
@@ -558,7 +558,65 @@ function tippedRoad(roadMat, style) {
 }
 
 // Approach to a set piece: glowing chevrons on the road and a gantry with a sign
-function approachSign(track, s, text, style, steel) {
+// A hazard board for a set piece: yellow and black stripes either side of a warning triangle
+// with a pictogram of what is coming (no words: it reads at a glance, in any language)
+const HAZARD_KINDS = ['loop', 'corkscrew', 'jump', 'lowg', 'wallride'];
+const hazardCache = {};
+function hazardTexture(kind) {
+  if (hazardCache[kind]) return hazardCache[kind];
+  const W = 1024, H = 208, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  // stripes
+  g.fillStyle = '#111111'; g.fillRect(0, 0, W, H);
+  g.save();
+  g.beginPath(); g.rect(0, 0, W, H); g.clip();
+  g.fillStyle = '#ffd400';
+  for (let x = -H; x < W + H; x += 64) { g.beginPath(); g.moveTo(x, H); g.lineTo(x + 32, H); g.lineTo(x + 32 + H, 0); g.lineTo(x + H, 0); g.closePath(); g.fill(); }
+  g.restore();
+  // the warning triangle in the middle, on a black panel
+  const cx = W / 2;
+  g.fillStyle = '#111111'; g.fillRect(cx - 150, 0, 300, H);
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(cx, 14); g.lineTo(cx + 112, 196); g.lineTo(cx - 112, 196); g.closePath();
+  g.fillStyle = '#ffd400'; g.fill();
+  g.lineWidth = 10; g.strokeStyle = '#ffffff'; g.stroke();
+  // the pictogram, black, inside the triangle (centre about cx, 140)
+  g.save();
+  g.translate(cx, 150); g.scale(1.22, 1.22); g.translate(-cx, -150); // (a little bigger: it reads from further)
+  g.strokeStyle = '#111111'; g.fillStyle = '#111111'; g.lineWidth = 9;
+  const y0 = 172; // the road line at the bottom of the pictogram
+  const road = (x0, x1) => { g.beginPath(); g.moveTo(cx + x0, y0); g.lineTo(cx + x1, y0); g.stroke(); };
+  if (kind === 'loop') {
+    road(-58, 58);
+    g.beginPath(); g.arc(cx, 128, 38, Math.PI * 0.62, Math.PI * 2.38); g.stroke();
+  } else if (kind === 'corkscrew') {
+    road(-62, -40); road(40, 62);
+    for (let k = -1; k <= 1; k++) { g.beginPath(); g.ellipse(cx + k * 22, 136, 18, 34, 0, 0, Math.PI * 2); g.stroke(); }
+  } else if (kind === 'jump' || kind === 'lowg') {
+    // ramp, gap, landing; the flight arc dotted over the gap
+    g.beginPath(); g.moveTo(cx - 64, y0); g.lineTo(cx - 22, y0); g.lineTo(cx - 22, y0 - 22); g.closePath(); g.fill();
+    road(18, 64);
+    g.setLineDash([2, 13]); g.lineWidth = 7;
+    const top = kind === 'lowg' ? 70 : 104;
+    g.beginPath(); g.moveTo(cx - 22, y0 - 26); g.quadraticCurveTo(cx + 2, top, cx + 34, y0 - 10); g.stroke();
+    g.setLineDash([]);
+    if (kind === 'lowg') for (const [x, y] of [[-40, 96], [44, 92], [8, 66]]) { g.beginPath(); g.arc(cx + x, y, 5, 0, Math.PI * 2); g.fill(); }
+  } else if (kind === 'wallride') {
+    road(-62, 10);
+    g.beginPath(); g.arc(cx + 10, y0 - 52, 52, Math.PI * 0.5, 0, true); g.stroke();
+    // arrow up the wall
+    g.beginPath(); g.moveTo(cx + 40, 132); g.lineTo(cx + 52, 104); g.lineTo(cx + 28, 112); g.closePath(); g.fill();
+  }
+  g.restore();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return (hazardCache[kind] = t);
+}
+
+// kind: what is coming (HAZARD_KINDS) for the board over the road, or null for chevrons only
+function approachSign(track, s, kind, style, steel) {
   const group = new THREE.Group();
   const hw = track.halfWidth;
   const cMat = new THREE.MeshBasicMaterial({ map: chevronTexture(), color: new THREE.Color(0xffd400).multiplyScalar(1.1), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
@@ -573,7 +631,7 @@ function approachSign(track, s, text, style, steel) {
       group.add(c);
     }
   }
-  if (!text) return group;
+  if (!kind) return group;
   const g = new THREE.Group();
   const gp = track.pointAt(s - 30, 0);
   for (const sd of [-1, 1]) {
@@ -582,8 +640,8 @@ function approachSign(track, s, text, style, steel) {
     pil.castShadow = true;
     g.add(pil);
   }
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(track.width * 0.8, 2.2), new THREE.MeshBasicMaterial({ map: textTexture(`▲  ${text}  ▲`, { accent: style.accent ?? '#ff2d55', bg: '#ffd400', fg: '#111111' }), toneMapped: false, side: THREE.DoubleSide }));
-  board.position.set(0, 8.2, 0);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(track.width * 0.8, track.width * 0.8 * (208 / 1024)), new THREE.MeshBasicMaterial({ map: hazardTexture(HAZARD_KINDS.includes(kind) ? kind : 'jump'), toneMapped: false, side: THREE.DoubleSide }));
+  board.position.set(0, 7.6, 0);
   board.rotation.y = Math.PI;
   g.add(board);
   const bar = new THREE.Mesh(new THREE.BoxGeometry(track.width + 4, 0.5, 0.6), steel);
@@ -662,6 +720,8 @@ function buildRail(rail, style, roadMat) {
       if (by - ground < 1.5) continue;
       for (const sd of [-1, 1]) {
         const x = bx + P.bx * sd * (hw - 2), z = bz + P.bz * sd * (hw - 2);
+        // never standing on the road the rail replaces (cars come through there before and after)
+        if (rail.kind === 'corkscrew' && Math.abs(track.project(x, z).lateral) < hw + 2) continue;
         cols.push({ x, z, y0: ground - foot, y1: by + P.by * sd * (hw - 2) });
       }
     }
@@ -708,24 +768,34 @@ function buildRail(rail, style, roadMat) {
     const Q = {};
     const axis = (u) => { rail.pose(u, 0, Q); return { x: Q.x + Q.ux * (rail.radius + 1.2), y: Q.y + Q.uy * (rail.radius + 1.2), z: Q.z + Q.uz * (rail.radius + 1.2) }; };
     const a0 = axis(lead + 2), a1 = axis(lead + mid - 2);
-    beamBetween(a0, a1, 1.6);
-    for (let u = lead + 8; u < lead + mid - 6; u += 10) {
+    // (no spine down the middle: the hoops carry the twist, the portals frame its ends)
+    // hoops round the outside of the twist, each tied to the slab's underside by a strut going
+    // outward: nothing crosses the road where the cars drive
+    const R = rail.radius + 5.5, hoop = new THREE.TorusGeometry(R, 0.4, 6, 40), zAxis = new THREE.Vector3(0, 0, 1);
+    for (let u = lead + 10; u < lead + mid - 8; u += 16) {
       rail.pose(u, 0, Q);
-      const under = { x: Q.x - Q.ux * 1.2, y: Q.y - Q.uy * 1.2, z: Q.z - Q.uz * 1.2 };
-      const ax = axis(u);
-      // the spoke runs from the axis out through the road to the slab's underside
-      beamBetween(ax, { x: under.x - (ax.x - under.x) * 0.06, y: under.y - (ax.y - under.y) * 0.06, z: under.z - (ax.z - under.z) * 0.06 }, 0.55);
+      const ax = axis(u), T = track.pointAt(rail.sOf(u), 0);
+      const ring = new THREE.Mesh(hoop, steel);
+      ring.position.set(ax.x, ax.y, ax.z);
+      ring.quaternion.setFromUnitVectors(zAxis, new THREE.Vector3(T.tx, 0, T.tz).normalize());
+      group.add(ring);
+      const k = R - rail.radius - 1.2; // from the underside out to the hoop
+      beamBetween({ x: Q.x - Q.ux * 1.2, y: Q.y - Q.uy * 1.2, z: Q.z - Q.uz * 1.2 }, { x: Q.x - Q.ux * (1.2 + k), y: Q.y - Q.uy * (1.2 + k), z: Q.z - Q.uz * (1.2 + k) }, 0.55);
     }
+    // at both ends a portal stands clear of the road: two towers outside the barriers and a
+    // crossbeam at the axis's height that the spine hangs from
     for (const a of [a0, a1]) {
+      const u = a === a0 ? lead + 2 : lead + mid - 2, tops = [];
       for (const sd of [-1, 1]) {
-        const p = track.pointAt(rail.sOf(a === a0 ? lead + 2 : lead + mid - 2), sd * (hw + 3));
-        beamBetween({ x: p.x, y: p.y - 1, z: p.z }, a, 1.1);
-        if (foot > 1) beamBetween({ x: p.x, y: p.y - foot, z: p.z }, { x: p.x, y: p.y - 0.5, z: p.z }, 1.6); // down to the valley floor
+        const p = track.pointAt(rail.sOf(u), sd * (hw + 4));
+        const top = { x: p.x, y: a.y + 1.4, z: p.z };
+        beamBetween({ x: p.x, y: p.y - foot, z: p.z }, top, 1.6);
+        tops.push(top);
       }
+      beamBetween(tops[0], tops[1], 1.4);
     }
   }
-  const label = { loop: 'LOOP', corkscrew: 'CORKSCREW' }[rail.kind];
-  group.add(approachSign(track, rail.sA + lead, label, style, steel));
+  group.add(approachSign(track, rail.sA + lead, rail.kind === 'helix' ? null : rail.kind, style, steel));
   return group;
 }
 
@@ -735,7 +805,7 @@ function buildJump(j, style) {
   const group = new THREE.Group();
   const track = j.track, hw = track.halfWidth;
   const steel = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.5, metalness: 0.7 });
-  group.add(approachSign(track, j.sRamp + 6, j.spec.sign === false ? null : j.spec.sign || 'JUMP', style, steel));
+  group.add(approachSign(track, j.sRamp + 6, j.spec.sign === false ? null : j.gravity < 1 ? 'lowg' : 'jump', style, steel));
   // the faces where the road stops and starts again: a deck's thickness, striped at the lip
   const stripe = new THREE.MeshBasicMaterial({ map: rampTexture(), toneMapped: true });
   const deck = new THREE.MeshStandardMaterial({ color: j.spec.deck ?? 0x2e2c2a, roughness: 0.85 });
@@ -775,15 +845,15 @@ function buildBank(b, style, roadMat, shoulderMat) {
     return [track.x[k] + rx * pr.off + ux * h, track.y[k] + pr.h + uy * h, track.z[k] + rz * pr.off + uz * h];
   };
   // grid between two across-road positions (cols columns); flip: face up when lat0 < lat1
-  const grid = (lat0, lat1, cols, h, mat, { uv = null, flip = false } = {}) => {
-    const pos = [], uvs = [], idx = [];
-    rows.forEach((i, r) => {
+  const grid = (lat0, lat1, cols, h, mat, { uv = null, flip = false, only = null } = {}) => {
+    const pos = [], uvs = [], idx = [], list = only || rows;
+    list.forEach((i, r) => {
       for (let c = 0; c <= cols; c++) {
         const lat = lat0 + ((lat1 - lat0) * c) / cols;
         pos.push(...point(i, lat, typeof h === 'function' ? h(c) : h));
         uvs.push(...(uv ? uv(c, i) : [c / cols, (i * track.step) / 40]));
       }
-      if (r < rows.length - 1) for (let c = 0; c < cols; c++) {
+      if (r < list.length - 1) for (let c = 0; c < cols; c++) {
         const a = r * (cols + 1) + c, b2 = a + 1, cc = a + cols + 1, d = cc + 1;
         if (flip) idx.push(a, b2, cc, b2, d, cc); else idx.push(a, cc, b2, b2, cc, d);
       }
@@ -798,10 +868,10 @@ function buildBank(b, style, roadMat, shoulderMat) {
     group.add(mesh);
     return mesh;
   };
+  // the road itself: the main road's material, mapped like the main road (u across, v along),
+  // so its texture and lane lines carry on up the curl without a seam
   const roadUv = (c, i) => [c / 24, (i * track.step) / 40];
-  const surf = tippedRoad(roadMat, style);
-  surf.side = THREE.DoubleSide;
-  grid(-hw, hw, 24, 0, surf, { uv: roadUv, flip: true });
+  grid(-hw, hw, 24, 0, roadMat, { uv: roadUv, flip: true });
   // shoulder strips: the flat side as usual, the curl side runs on up to the lip
   grid(-sd * (hw + 2.2), -sd * hw, 2, -0.03, shoulderMat, { flip: sd > 0 });
   grid(sd * hw, sd * (hw + 0.5), 2, -0.01, shoulderMat, { flip: sd > 0 });
@@ -839,13 +909,15 @@ function buildBank(b, style, roadMat, shoulderMat) {
   // glowing strips along the curve (a tube of light) - three lines up the half-pipe
   if (look.strips !== false) {
     const stripMat = new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(0.8), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    for (const f of [0.45, 0.68, 0.88]) {
+    // (only where the curl has risen: on the flat they would just be lines on the road)
+    const curled = rows.filter((i) => b.amount(i * track.step) > 0.35);
+    if (curled.length > 1) for (const f of [0.45, 0.68, 0.88]) {
       const lat = sd * hw * f;
-      grid(lat - sd * 0.18, lat + sd * 0.18, 1, 0.02, stripMat, { flip: sd > 0 });
+      grid(lat - sd * 0.18, lat + sd * 0.18, 1, 0.02, stripMat, { flip: sd > 0, only: curled });
     }
   }
   // chevrons and a gantry before it, like the other set pieces
   const signSteel = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.5, metalness: 0.7 });
-  group.add(approachSign(track, b.s0 + 4, b.spec.sign === false ? null : b.spec.sign || 'WALL RIDE', style, signSteel));
+  group.add(approachSign(track, b.s0 + 4, b.spec.sign === false ? null : 'wallride', style, signSteel));
   return group;
 }

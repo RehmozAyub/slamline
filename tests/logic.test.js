@@ -714,3 +714,48 @@ test('the frozen tarn on Whiteout Summit is slippery and only there', () => {
   assert.equal(gripAt(ice, t, t.wrapS(ice[0].b + 50)), 1);
   assert.equal(gripAt(ice, t, t.wrapS(ice[0].a - 50)), 1);
 });
+
+// --- set-piece jumps (features.js): safe at any speed, tricks land clean -----------------------
+const jumpRun = (t, F, j, { sp, lat = 0, boost = false, trick = 0 }) => {
+  const set = new ShortcutSet(t, []);
+  const v = new Vehicle(CARS[1]);
+  v.placeOnTrack(t, t.wrapS(j.sRamp - 60), lat, sp);
+  let slam = 0, crash = false, land = null;
+  for (let k = 0; k < 120 * 6 && !land; k++) {
+    const q = t.project(v.x, v.z), d = t.deltaS(j.sLip, q.s);
+    const hb = trick && d > -8 && !v.air;
+    const aim = t.pointAt(t.wrapS(q.s + 12 + v.speed * 0.35), lat * 0.5);
+    let e = Math.atan2(aim.x - v.x, aim.z - v.z) - v.heading;
+    e = Math.atan2(Math.sin(e), Math.cos(e));
+    v.update(1 / 120, { throttle: 1, boost, brake: 0, steer: hb ? trick : Math.max(-1, Math.min(1, -e * 2.4)), handbrake: hb }, 1.32);
+    const h = constrainOnRoads(v, t, set, 1 / 120, {}, {}, F.jumps, F.banks);
+    if (h && v.air) slam = Math.max(slam, h.vn || 0);
+    if (h && !v.air && !(v.landCool > 0) && isWallCrash({ speed: h.speed, angleDeg: h.angle }, RULES)) crash = true;
+    if (v.events) land = v.events.find((e) => e.type === 'land' && e.airTime > 0.3) || null;
+  }
+  return { slam, crash, land };
+};
+
+test('set-piece jumps: however fast a car arrives, it follows the road through the air', () => {
+  for (const id of Object.keys(LAYOUTS)) {
+    const lay = LAYOUTS[id], t = new TrackPath(lay.points, { width: lay.width }), F = layoutFeatures(t, lay);
+    for (const j of F.jumps) {
+      for (const sp of [56, 80, 105]) for (const lat of [-6, 0, 6]) {
+        const r = jumpRun(t, F, j, { sp, lat, boost: sp > 90 });
+        assert.ok(r.land, `${id}: landed (speed ${sp}, lane ${lat})`);
+        assert.ok(r.slam < 3, `${id}: hit a wall in the air at ${r.slam.toFixed(1)} m/s (speed ${sp}, lane ${lat})`);
+        assert.ok(!r.crash, `${id}: crashed after the jump (speed ${sp}, lane ${lat})`);
+      }
+    }
+  }
+});
+
+test('set-piece jumps: a drift into the lip spins the car round and lands it clean', () => {
+  for (const id of ['canyon', 'coast', 'space']) {
+    const lay = LAYOUTS[id], t = new TrackPath(lay.points, { width: lay.width }), F = layoutFeatures(t, lay);
+    for (const trick of [-0.8, 0.8]) {
+      const r = jumpRun(t, F, F.jumps[0], { sp: 60, trick });
+      assert.ok(r.land && r.land.trick === 'spin' && r.land.clean, `${id}: ${r.land ? (r.land.trick || 'no trick') + (r.land.clean ? '' : ' (sloppy)') : 'no landing'}`);
+    }
+  }
+});
