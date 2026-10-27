@@ -94,23 +94,19 @@ export class UI {
         <div class="howto">
           <div class="col">
             <h2>THE RACE</h2>
-            <p>3 laps, 8 cars. Finish first and wreck rivals on the way.</p>
-            <h2>ONLINE</h2>
-            <p><b>ONLINE → HOST</b> shows a 4-letter <b>room code</b>: your friend picks <b>JOIN</b> and types it. You race each other plus 6 AI, each on your own device. Pick a name first; the host picks the track. A crash between the two of you goes to whoever hit first.</p>
+            <p>3 laps. Finish first and wreck rivals on the way.</p>
             <h2>BOOST</h2>
-            <p>Fill the meter by <b>drifting</b>, <b>near misses</b>, <b>slipstreaming</b> behind rivals, <b>takedowns</b> and <b>boost rings</b> on the road. Chain moves quickly for an adrenaline multiplier up to <b>×5</b>.</p>
+            <p>Earn it by <b>drifting</b>, <b>near misses</b>, <b>slipstreaming</b> and <b>takedowns</b>. Chain moves for a multiplier.</p>
             <h2>TAKEDOWNS</h2>
-            <p>Slam a rival hard, or shove them into a wall. Hit a wall head-on or get rammed and you crash. Some takedowns have names and pay more: <b>GRINDER</b> (pin them against the wall), <b>SHUNT</b> (ram them from behind), <b>AIR STRIKE</b> (hit them while you're airborne) and <b>LANDED ON</b> (come down on top of them).</p>
+            <p>Slam a rival hard or shove them into a wall. Hit a wall head-on and you crash. Whoever wrecks you becomes your <b>RIVAL</b>: pay them back.</p>
+            <h2>SECRETS</h2>
+            <p>Every track hides <b>shortcuts</b>, takedown spots and a few surprises. Go and find them.</p>
             <h2>DRIVE ASSIST</h2>
-            <p>On by default: you steer, it helps. It nudges you away from the walls, calms over-steering, brakes for bends you'd miss and makes wall hits less punishing. <span class="k-in">Press <b>H</b> in a race (or use the pause menu)</span><span class="t-in">Turn it off in the pause menu</span> to drive fully manual.</p>
-            <h2>RIVALS &amp; SECRETS</h2>
-            <p>Whoever wrecks you becomes your <b>RIVAL</b>: take them out for a big <b>PAYBACK</b> boost. Some rivals have a style: <b>HAVOC</b> and <b>DIESEL</b> are bullies who ram, <b>KAZE</b> and <b>VIXEN</b> always take the shortcuts, <b>NOVA</b> and <b>COMET</b> race clean. Every track hides <b>shortcuts</b> (some behind fences, some with <b>ramps</b>: drift into the jump for a <b>flat spin</b>, keep holding drift for an <b>aerial donut</b>, or <b>barrel roll</b> off a half ramp) and four <b>signature takedown</b> spots. Earn <b>three stars</b> per track (win, 5 takedowns, no crashes) and unlock new paints with takedowns and stars.</p>
-            <h2>SET PIECES</h2>
-            <p><b>Loops</b>, <b>corkscrews</b> and <b>spirals</b> carry you round (nothing can wreck you on them) and pay out boost. Take <b>jumps</b> flat out: come up short and you drop in. Ride high on a <b>wall-ride</b> for boost. On <b>ice</b> the tyres barely grip: steer gently. Get behind a jet on its take-off run for a <b>JET BLAST</b>. At a <b>level crossing</b> watch the lights: a train flattens anything in its way, and a rival shoved under one is a <b>TRAIN WRECK</b>. The tracks fight back: a wreck near the avalanche gallery brings snow down onto the road, boulders fall in the canyon, and a jet lands on the runway next to you. Smash the <b>cones, crates and barrels</b> by the road for a little boost.</p>
-            <h2>MIRRORED TRACKS</h2>
-            <p>Now and then a race runs on the track's mirror image. Turn it off under <b>Settings → MIRRORED TRACKS</b>.</p>
+            <p>On by default: you steer, it helps. <span class="k-in">Press <b>H</b> (or use the pause menu)</span><span class="t-in">Turn it off in the pause menu</span> to drive fully manual.</p>
+            <h2>ONLINE</h2>
+            <p><b>HOST</b> gives a 4-letter room code; friends pick <b>JOIN</b> and type it.</p>
             <h2>POWER-UPS</h2>
-            <p class="note">Every block shows what's inside. Drive through one to grab it (a new one replaces the one you hold). Rivals use them too.</p>
+            <p class="note">Drive through a block to grab what it shows.</p>
             ${POWER_IDS.map((id) => `<p class="pw">${icon(id)}<b style="color:${POWERS[id].color}">${POWERS[id].name}</b> ${POWERS[id].desc.toLowerCase()}</p>`).join('')}
           </div>
           <div class="col">

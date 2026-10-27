@@ -11,7 +11,7 @@ import { buildCar, disposeCar } from './carModel.js';
 import { Effects } from './fx.js';
 import { RaceTracker } from './race.js';
 import { BoostSystem, RULES, isNearMiss, isDrafting, classifyImpact, isPushTakedown, isWallCrash } from './burnout.js';
-import { CARS, PAINTS, BASE_PAINTS, AI_NAMES, AI_STYLES, STYLE_TAG, LAPS, CAR_COUNT, clampCars } from './config.js';
+import { CARS, PAINTS, BASE_PAINTS, AI_NAMES, AI_STYLES, LAPS, CAR_COUNT, clampCars } from './config.js';
 import { wrapAngle } from './trackMath.js';
 import { PickupState, layoutPickups, strikeTarget, stepShot, inBox, aiWantsPower, POWERS, PICKUP_RULES, AI_POWER } from './powerups.js';
 import { PickupVisuals } from './pickups.js';
@@ -115,6 +115,12 @@ export class RaceSession {
       humanSlots = humanDefs.map((h, i) => first + i);
     }
     const aiCount = total - humanDefs.length;
+    // rival styles in proportion to the field: about one AI in six of each (staggered so a
+    // small field gets a bully first), dealt out at random; the rest are all-rounders
+    const styles = [];
+    AI_STYLES.forEach((st, k) => { for (let i = Math.round((aiCount - k) / 6); i > 0; i--) styles.push(st); });
+    while (styles.length < aiCount) styles.push(null);
+    const aiStyles = shuffle(styles, rand);
     const L = this.track.length;
     this.cars = [];
     this.humans = [];
@@ -141,7 +147,7 @@ export class RaceSession {
         id: this.online ? (isPlayer ? (local ? 'player' : hd.id) : `ai${ai}`) : isPlayer ? (hi === 0 ? 'player' : 'player2') : `ai${ai}`,
         name: isPlayer ? (this.split ? `P${hi + 1}` : this.online ? hd.name || (local ? 'YOU' : 'FRIEND') : 'YOU') : names[ai],
         isPlayer, vehicle: v, model, spec, paint, human: null, owner, remote, index: slot,
-        ai: isPlayer || remote ? null : new AIDriver(v, this.track, { lane: lat * 0.6, skill: aiSkill[ai % aiSkill.length], aggression: aiAggro[ai % aiAggro.length], refTopSpeed: refTop, shortcuts: this.shortcuts ? this.shortcuts.list : [], style: AI_STYLES[names[ai]] || null }),
+        ai: isPlayer || remote ? null : new AIDriver(v, this.track, { lane: lat * 0.6, skill: aiSkill[ai % aiSkill.length], aggression: aiAggro[ai % aiAggro.length], refTopSpeed: refTop, shortcuts: this.shortcuts ? this.shortcuts.list : [], style: aiStyles[ai] }),
         controls: { steer: 0, throttle: 0, brake: 0, handbrake: false, boost: false },
         power: null, powerTime: 0,
         pushedAt: -99, pushedBy: null, lastContact: -99, prevFwd: [0, 0], respawn: 0, mul: 1,
@@ -364,12 +370,7 @@ export class RaceSession {
     }
     for (const c of this.cars) if (c.vehicle.events && c.vehicle.events.length) this.onAirEvents(c);
     if (racing) this.setPieceSounds();
-    if (this.world.smash && racing) this.world.smash.update(dt, this.cars, (c, it) => this.onSmash(c, it));
     if (this.obstacles.length && racing) this.hitObstacles(dt);
-    for (const H of this.humans) if (H.smashT > 0 && (H.smashT -= dt) <= 0 && H.smashN) {
-      this.scoreEvent(H, H.smashN > 1 ? `SMASH ×${H.smashN}` : 'SMASH', H.smashGain);
-      H.smashN = 0; H.smashGain = 0;
-    }
     this.fences.update(dt, this.cars);
 
     for (const c of this.cars) {
@@ -507,20 +508,6 @@ export class RaceSession {
 
   // a car wrecked at v.s: the map may answer (the avalanche comes down ...)
   noteWreck(v) { if (this.world.onWreck) this.world.onWreck(v.s); }
-
-  // a car sent a prop flying (smash.js): a bit of boost for a player, counted up into one
-  // SMASH ×n popup per run of them
-  onSmash(c, it) {
-    const v = c.vehicle, vol = c.human ? 0.5 : this.audibility(v) * 0.5;
-    if (vol > 0.04) this.game.audio.impact(0.18 + vol * 0.2);
-    if (this.fx.sparks) this.fx.sparks(it.x, it.y + 0.6, it.z, v.vx * 0.3, v.vz * 0.3, 5, 0.4);
-    const H = c.human;
-    if (!H || this.state !== 'racing') return;
-    H.smashGain = (H.smashGain || 0) + H.boost.add(3);
-    H.smashN = (H.smashN || 0) + 1;
-    H.smashT = 0.7;
-    this.game.haptic(H, 0.25);
-  }
 
   // smashed through a fence into a hidden shortcut
   onFence(c) {
@@ -1263,8 +1250,7 @@ export class RaceSession {
     this.fx.explosion(v.x, v.y + 0.6, v.z, v.vx, v.vz, car.paint, v.y);
     this.game.audio.crash();
     this.game.haptic(H, 1.5);
-    const tag = byCar && byCar.ai && byCar.ai.style ? ` ${STYLE_TAG[byCar.ai.style]}` : '';
-    this.popup(label, byCar ? `by ${byCar.name}${tag}${grudge ? ' · NEW RIVAL' : ''}` : 'CRASH', 'bad', H);
+    this.popup(label, byCar ? `by ${byCar.name}${grudge ? ' · NEW RIVAL' : ''}` : 'CRASH', 'bad', H);
     this.slowMo(this.split ? 0.8 : 1.8);
     H.flash = 0.35;
     H.rig.startCrashCam(v, this.split ? 1.2 : 1.8, 1);
