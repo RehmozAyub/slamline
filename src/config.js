@@ -56,11 +56,10 @@ export const PAINTS = [
 export const BASE_PAINTS = PAINTS.filter((p) => !p.unlock).length; // AI rivals only use these
 
 export const AI_NAMES = ['VORTEX', 'KAZE', 'NOVA', 'RAZOR', 'HAVOC', 'STRYKER', 'ONYX', 'BLITZ', 'VIXEN', 'DIESEL', 'COMET', 'RIPTIDE'];
-// some rivals always drive the same way, so players get to know them:
+// some rivals drive a set way (about one AI in six of each, whatever the field size; session.js):
 //   bully - rams you whenever it gets the chance; sneak - takes every shortcut;
 //   clean - never makes contact if it can steer clear (the rest are all-rounders)
-export const AI_STYLES = { HAVOC: 'bully', DIESEL: 'bully', KAZE: 'sneak', VIXEN: 'sneak', NOVA: 'clean', COMET: 'clean' };
-export const STYLE_TAG = { bully: 'THE BULLY', sneak: 'THE SNEAK', clean: 'THE CLEAN RACER' };
+export const AI_STYLES = ['bully', 'sneak', 'clean'];
 
 // cars per race (players + AI), chosen in Settings (online: by the host in the lobby)
 export const CAR_COUNT = { min: 2, max: 12, def: 8 };
