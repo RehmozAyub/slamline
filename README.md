@@ -24,12 +24,15 @@ Arcade 3D takedown racing in the browser — Burnout-style boost, takedowns and 
 - **Final lap drama:** the music lifts, and a player right behind the leader gets pulled along
 - **Drive Assist** (on by default, per player): you still steer — it nudges you off the walls, calms over-steering, brakes for bends you would miss and makes wall hits less punishing — toggle it any time with H, [ or the gamepad Back button, or from the pause menu
 - **2-player split screen** on one keyboard (or two gamepads) — take each other out too
-- **Online rooms for 2-8 players:** ONLINE → HOST gives a 4-letter room code, friends pick JOIN and type it. Everyone plus AI rivals (the host picks how many), each on your own PC, phone or browser; pick a name, the host picks the track. Cars are sent 60 times a second and smoothed; a hit between the two of you goes to whoever hit first. No account needed: a free matchmaking service connects you, then the games talk directly. Some pairs of networks have no direct route and need a relay server (see Development)
+- **Online rooms for 2-8 players:** ONLINE → HOST gives a 6-character room code, friends pick JOIN and type it; the host can KICK a player from the lobby. Everyone plus AI rivals (the host picks how many), each on your own PC, phone or browser; pick a name, the host picks the track. Cars are sent 60 times a second and smoothed; a hit between the two of you goes to whoever hit first. No account needed: a free matchmaking service connects you, then the games talk directly. Some pairs of networks have no direct route and need a relay server (see Development)
 - Boost meter filled by drifting, near misses, slipstreaming and takedowns, with an adrenaline chain multiplier up to ×5
 - Takedowns with slow-motion crash cam; rivals can take you out too. Named takedowns pay extra: GRINDER (pinned against the wall), SHUNT (rammed from behind), AIR STRIKE (hit from the air) and LANDED ON (crushed from above)
 - Road pickups: boost rings that respawn, and power-up blocks that show what they hold (grabbing a new one replaces yours; AI rivals grab about half of the blocks they drive through; pickups come back after half a second) — **Shockwave** (wrecks everyone near you), **Ricochet** (a shot that bounces down the road until it hits a rival), **Lightning Strike** (hits the car ahead), **Oil Slick** (drop it behind you — chasers crash)
 - **Phones and tablets:** touch controls, with the car accelerating by itself. Steer with a thumb slider (default), ◀ ▶ buttons or by tilting the phone. Haptics on crashes and takedowns (a big thud on long landings and when you land on a car), and an **AUTO** graphics level that picks a setting for your phone and adjusts it as it measures the frame rate
 - Motion blur, speed lines, bloom, chromatic aberration, synthesized engine sounds and music
+- **RECORD** in the pause menu films your race (picture, sound and a slim HUD) until the finish line or STOP RECORDING, and saves it on your device (Downloads, or Videos\SLAMLINE for the exe) to share or attach to a bug report
+- **FEEDBACK** on the title screen sends an anonymous bug report or idea; [GitHub Issues](https://github.com/RehmozAyub/slamline/issues) are there if you want an answer
+- Anonymous play stats (sessions, play time, countries, tracks; no IDs, no cookies), off with Settings → SHARE PLAY STATS. Details in [PRIVACY.md](PRIVACY.md)
 
 ## Controls
 
@@ -65,4 +68,12 @@ npm run release              # ships the committed main everywhere (see below)
 
 The Android app (`android/`) is a full-screen WebView that serves the bundled `game/` folder offline. `build-apk.mjs` installs JDK 17, the Android SDK and Gradle into `S:\SlamlineAndroid` the first time it runs (set `SLAMLINE_ANDROID_HOME` to use another folder). It also creates the release signing key in `android/signing/`, which is gitignored. Keep that key: Android only installs an update over the app when it is signed with the same key.
 
+Play stats and feedback go to a small Cloudflare Worker with a D1 database in `server/` (deploying it, the dashboard and the keys: [server/README.md](server/README.md)). The game only sends them from the GitHub Pages site and from an exe built by `tools/build.mjs` with the official-build key; a dev server logs what it would send to the console instead when `localStorage['slamline.statsDebug']` is set.
+
+Online messages from other players are checked before use (`game/src/net/guard.js`): numbers out of range, markup in text, cars a player doesn't own and floods are dropped.
+
 Online play finds a direct route between players with STUN. For networks that have none, a relay (TURN) can be switched on without a new build: `game/net-config.json` on the website holds either `{"turn": "<url that returns ICE servers>"}` (for example a Metered credentials URL) or `{"iceServers": [...]}`. The exe and the Android app read it from https://rehmozayub.github.io/slamline/net-config.json.
+
+## License
+
+SLAMLINE is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): you may play, read, change and share it for free, but not sell it or use it commercially. The SLAMLINE name and logo aren't licensed, so a copy you publish needs another name. The libraries in `game/vendor` (three.js, PeerJS) keep their own MIT licenses. Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).

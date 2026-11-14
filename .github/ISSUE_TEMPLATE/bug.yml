@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in the game doesn't work or looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be seen again?
+      description: Track, car, mode (solo, split screen, online) and what you did.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where do you play?
+      options:
+        - Browser on a computer
+        - Browser on a phone or tablet
+        - Windows exe
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Game version
+      description: Shown on the release you downloaded, or "web" for the browser version.
+  - type: textarea
+    id: video
+    attributes:
+      label: Video or screenshot
+      description: Pause the game and choose RECORD to film it, then drag the saved video here. Please don't include personal details.

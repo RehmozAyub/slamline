@@ -1,0 +1,16 @@
+name: Idea
+description: Something that would make the game better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What should change, and what would it be like to play?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: What's missing or annoying today?
