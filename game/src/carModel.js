@@ -3,7 +3,7 @@
 // merged per material so a car costs only a handful of draw calls.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { radialTexture } from './textures.js';
+import { radialTexture, markText } from './textures.js';
 
 // keyframes: [u, hwBottom, hwTop, yBottom, yTop]  (u: 0 = rear, 1 = front)
 const STYLES = {
@@ -622,8 +622,8 @@ function plateTexture() {
   g.fillStyle = '#f4f1e6'; g.fillRect(0, 0, 256, 72);
   g.strokeStyle = '#222'; g.lineWidth = 6; g.strokeRect(3, 3, 250, 66);
   g.fillStyle = '#1a1a1a'; g.font = 'bold 48px Bahnschrift, "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('APX·RSH', 128, 38);
-  const t = new THREE.CanvasTexture(c);
+  g.fillText('SLAMLINE', 128, 38, 232);
+  const t = markText(new THREE.CanvasTexture(c)); // reads the right way round in a mirrored race too
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
