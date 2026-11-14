@@ -879,7 +879,8 @@ function buildBank(b, style, roadMat, shoulderMat) {
   const look = b.spec.look || {};
   const wallMat = addWorldDetail(new THREE.MeshStandardMaterial({ color: look.wall ?? bs.color ?? 0x5a5c66, roughness: 0.75, metalness: 0.1, side: THREE.DoubleSide }), { fine: [1.2, 0.35], macro: [0.04, 0.25], rough: 0.2, triplanar: true });
   const glow = new THREE.Color(look.glow ?? (bs.glow ? bs.glow[sd < 0 ? 0 : 1] ?? bs.glow[0] : 0xffd23f)).multiplyScalar(look.glowIntensity ?? 3.2);
-  const glowMat = new THREE.MeshBasicMaterial({ color: glow, side: THREE.DoubleSide });
+  // (the lip line stays bright but short of a bloom that would haze over a car riding below it)
+  const glowMat = new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(Math.min(1, 1.1 / (look.glowIntensity ?? 3.2))), side: THREE.DoubleSide });
   // the lip wall on the curl (standing off the surface) and the flat side's wall
   const wallOn = (lat, hgt, back) => {
     grid(lat, lat, 1, (c) => c * hgt, wallMat);
@@ -906,12 +907,14 @@ function buildBank(b, style, roadMat, shoulderMat) {
     back.castShadow = true;
     group.add(back);
   }
-  // glowing strips along the curve (a tube of light) - three lines up the half-pipe
+  // glowing strips along the curve (a tube of light) - three lines up the half-pipe, kept dim
+  // enough that their bloom doesn't flood the wall and swallow a car riding on it, and off the
+  // line a car takes when it rides high (about 0.9 of the way up)
   if (look.strips !== false) {
-    const stripMat = new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(0.8), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const stripMat = new THREE.MeshBasicMaterial({ color: glow.clone().multiplyScalar(Math.min(0.8, 1.1 / (look.glowIntensity ?? 3.2))), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     // (only where the curl has risen: on the flat they would just be lines on the road)
     const curled = rows.filter((i) => b.amount(i * track.step) > 0.35);
-    if (curled.length > 1) for (const f of [0.45, 0.68, 0.88]) {
+    if (curled.length > 1) for (const f of [0.3, 0.52, 0.72]) {
       const lat = sd * hw * f;
       grid(lat - sd * 0.18, lat + sd * 0.18, 1, 0.02, stripMat, { flip: sd > 0, only: curled });
     }
