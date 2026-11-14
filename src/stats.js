@@ -4,7 +4,7 @@
 // played, races started / finished / quit, one frame-rate sample, online room counts and any
 // errors. There is no player ID: `sid` is made up each time the game starts and lives only in
 // memory, so two sessions can't be linked. Settings → SHARE PLAY STATS turns it off. Only the
-// official game sends: the web version on GitHub Pages, and the Windows exe, whose release
+// official game sends: the web version on GitHub Pages (and its copy on itch.io), and the Windows exe, whose release
 // build carries a key in official.json (never in the repository). Dev servers send nothing
 // (set localStorage 'slamline.statsDebug' to see what would go in the console).
 import { VERSION } from './version.js';
@@ -12,6 +12,8 @@ import { IS_MOBILE } from './config.js';
 
 export const SERVER = 'https://slamline-stats.slamline.workers.dev';
 const PAGES = 'https://rehmozayub.github.io';
+// itch.io serves browser games from its own hosts (one shared by every game there)
+export const ITCH = /^https:\/\/(html(-classic)?\.itch\.zone|v6p9d9t4\.ssl\.hwcdn\.net)$/;
 const BEAT = 5 * 60; // seconds between beats
 const IDLE = 120; // seconds without any input before the time stops counting as played
 const MAX_ERRORS = 20; // per session
@@ -20,11 +22,12 @@ export class PlayStats {
   constructor(game) {
     this.game = game;
     this.sid = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(36).padStart(2, '0')).join('');
-    this.platform = location.protocol === 'app:' ? 'exe' : IS_MOBILE || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches) ? 'web-phone' : 'web-desktop';
+    const onItch = ITCH.test(location.origin), phone = IS_MOBILE || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
+    this.platform = location.protocol === 'app:' ? 'exe' : (onItch ? 'itch-' : 'web-') + (phone ? 'phone' : 'desktop');
     this.debug = false;
     try { this.debug = !!localStorage.getItem('slamline.statsDebug'); } catch {}
     this.buildKey = null;
-    this.official = location.origin === PAGES;
+    this.official = location.origin === PAGES || onItch;
     if (location.protocol === 'app:') {
       fetch('official.json').then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.key) { this.buildKey = j.key; this.official = true; } }).catch(() => {});
     }
