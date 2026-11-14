@@ -331,6 +331,20 @@ export default {
       jumpSign.position.set(edge.x, edge.y + 5.5, edge.z);
       jumpSign.rotation.y = Math.atan2(edge.tx, edge.tz) + Math.PI;
       scene.add(jumpSign);
+      // under the roof's edge the road ends in the car park's end wall (driving back up the road
+      // the wrong way, this is what you hit: session.js railEnd)
+      const W = track.pointAt(helix.s1 - 1.6, 0), ground = track.pointAt(helix.s1, 0).y, top = edge.y - 0.4 - ground;
+      const end = new THREE.Group();
+      end.add(new THREE.Mesh(new THREE.BoxGeometry(2 * hw + 4, top, 3.2).translate(0, top / 2, 0), concrete));
+      for (const y of [1.1, top - 0.8]) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(2 * hw + 4, 0.22, 0.1), neonMat(0xff2d95, 4));
+        strip.position.set(0, y, 1.66);
+        end.add(strip);
+      }
+      end.position.set(W.x, ground - 0.05, W.z);
+      end.rotation.y = W.heading;
+      end.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
+      scene.add(end);
     }
 
     // --- the corner tower the wall-ride wraps round -----------------------------------------
