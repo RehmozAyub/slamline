@@ -19,6 +19,9 @@ import { SIGNATURE_KINDS } from './signatures.js';
 import { OnlineFlow } from './onlineMenu.js';
 import { TouchControls } from './touch.js';
 import { setTextMirror } from './textures.js';
+import { PlayStats } from './stats.js';
+import { Feedback } from './feedback.js';
+import { Recorder } from './recorder.js';
 
 // setTimeout (not rAF) so loading also progresses when the window is hidden
 const IS_DESKTOP = /Electron/i.test(navigator.userAgent);
@@ -57,6 +60,9 @@ class Game {
   async init() {
     this.ui = new UI(document.getElementById('ui'));
     this.onlineFlow = new OnlineFlow(this);
+    this.stats = new PlayStats(this);
+    this.feedback = new Feedback(this);
+    this.recorder = new Recorder(this);
     const canvas = document.getElementById('gl');
     this.gpu = gpuName();
     this.gpuKey = `${IS_MOBILE ? 'mobile' : 'desktop'} ${this.gpu}`;
@@ -275,6 +281,7 @@ class Game {
       { key: 'music', label: 'MUSIC VOLUME', value: bar(s.music) },
     );
     items.push({ key: 'mirror', label: 'MIRRORED TRACKS', value: onOff(s.mirror !== false) });
+    items.push({ key: 'shareStats', label: 'SHARE PLAY STATS', value: onOff(s.shareStats !== false) });
     if (this.touch) items.push({ key: 'vibration', label: 'VIBRATION', value: onOff(s.vibration) });
     if (!IS_APP) items.push({ key: 'fullscreen', label: 'FULLSCREEN', value: onOff(document.fullscreenElement) });
     items.push({ key: 'back', label: 'BACK' });
@@ -323,6 +330,8 @@ class Game {
       this.touch.setMode(s.steering);
     } else if (key === 'mirror') {
       s.mirror = s.mirror === false;
+    } else if (key === 'shareStats') {
+      s.shareStats = s.shareStats === false;
     } else if (key === 'vibration') {
       s.vibration = !s.vibration;
       if (s.vibration) this.buzz(40, 200);
@@ -388,9 +397,11 @@ class Game {
       items.push({ key: 'assist0', label: 'P1 DRIVE ASSIST', value: onOff(this.assistOn(0)) });
       items.push({ key: 'assist1', label: 'P2 DRIVE ASSIST', value: onOff(this.assistOn(1)) });
     } else items.push({ key: 'assist0', label: 'DRIVE ASSIST', value: onOff(this.assistOn(0)) });
+    if (this.recorder.supported) items.push(this.recordItem());
     items.push({ key: 'restart', label: 'RESTART' }, { key: 'settings', label: 'SETTINGS' }, { key: 'quit', label: 'QUIT TO MENU' });
     return items;
   }
+  recordItem() { return { key: 'record', label: this.recorder.on ? 'STOP RECORDING' : 'RECORD' }; }
   renderPause() { this.ui.menu('m-pause', this.pauseItems(), this.menuIndex.pause); }
 
   resultsItems() {
@@ -418,6 +429,8 @@ class Game {
     if (online) players = online.players;
     this.session = new RaceSession(this, this.world, { players, net: online ? online.net : null, cars: online ? online.cars : this.carCount(), mirror: this.settings.mirror !== false });
     this.setMirror(this.session.mirrored);
+    this.stats.raceStarted(MAPS[this.raceTrack].id, online ? 'online' : this.players > 1 ? 'split' : 'solo', this.session.mirrored);
+    if (online && this.onlineFlow.role === 'host' && !this.onlineFlow.counted) { this.onlineFlow.counted = true; this.stats.roomPlayers(online.players.length); }
     this.ui.clearPopups();
     this.state = 'race';
     this.ui.show('hud');
@@ -440,6 +453,7 @@ class Game {
 
   endSession() {
     this.pendingShot = null;
+    this.recorder.stop();
     this.setMirror(false);
     if (!this.session) return;
     this.session.dispose();
@@ -449,6 +463,8 @@ class Game {
   }
 
   async quitToMenu() {
+    this.stats.raceEnded('quit');
+    this.recorder.stop();
     this.ui.fade(true);
     await new Promise((r) => setTimeout(r, 350));
     this.endSession();
@@ -494,6 +510,8 @@ class Game {
       for (const p of got.paints) extras.push(`NEW PAINT: ${p.name.toUpperCase()}`);
     }
     saveSettings(this.settings);
+    this.stats.raceEnded('finish');
+    this.recorder.stopSoon();
     this.autoUpgrade();
     this.ui.results(list, `${head} <small style="font-size:3vh;opacity:.8">&nbsp; ${tds}</small>${record}`, extras);
     this.resultsFinished = this.session.race.finishOrder.length;
@@ -541,6 +559,8 @@ class Game {
       if (a === 'back') { if (this.onlineFlow.active) this.onlineFlow.carChosen(); else if (this.carPick === 1) this.showCars(0); else this.showTracks(); }
     } else if (st === 'howto') {
       if (a === 'confirm' || a === 'back') this.showTitle();
+    } else if (st === 'feedback') {
+      if (a === 'back') this.feedback.close();
     } else if (st === 'settings') {
       const items = this.settingsItems(), n = items.length;
       const onBack = items[this.menuIndex.settings].key === 'back';
@@ -591,7 +611,11 @@ class Game {
   pauseSelect(i) {
     const key = this.pauseItems()[i].key;
     if (key === 'resume') { this.state = 'race'; this.ui.show('hud'); }
-    else if (key.startsWith('assist')) {
+    else if (key === 'record') {
+      // RECORD films from the moment the race carries on; STOP RECORDING saves right away
+      if (this.recorder.on) { this.recorder.stop(); this.renderPause(); }
+      else { this.recorder.start(); this.state = 'race'; this.ui.show('hud'); }
+    } else if (key.startsWith('assist')) {
       const p = Number(key.slice(6));
       this.setAssist(p, !this.assistOn(p));
       this.audio.blip(700, 0.04, 0.08);
@@ -779,6 +803,7 @@ class Game {
     const realDt = Math.min(0.05, (now - (this.lastFrame ?? now)) / 1000);
     this.lastFrame = now;
     this.time += realDt;
+    this.stats.tick(realDt, this.state === 'race');
     this.input.poll();
     const cam = this.renderer.camera;
     if (this.state === 'race' && this.session) {
@@ -819,6 +844,7 @@ class Game {
     for (const fx of this.renderer.fxs) fx.weather = this.world ? this.world.flash : 0;
     if (this.session) this.session.fx.setScale(this.renderer.height / (2 * Math.tan((cam.fov * Math.PI) / 360)));
     this.renderer.render(this.time);
+    this.recorder.frame(realDt);
     const shot = this.pendingShot;
     if (shot && this.state === 'race' && (shot.t -= realDt) <= 0) {
       this.pendingShot = null;
