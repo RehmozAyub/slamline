@@ -596,7 +596,7 @@ body.touch #tc.on { display: block; position: absolute; inset: 0; pointer-events
   letter-spacing: 0.08em; text-transform: uppercase; color: #fff; background: rgba(255,255,255,0.06); border: 0.3vh solid rgba(255,255,255,0.25); border-radius: 0; outline: none; caret-color: var(--hot); }
 .o-field input:focus { border-color: var(--hot); box-shadow: 0 0 3vh rgba(255,45,85,0.35); }
 .o-field input::placeholder { color: rgba(255,255,255,0.3); }
-.o-field.code input { width: 40vh; font-size: 7vh; letter-spacing: 0.35em; text-indent: 0.35em; text-align: center; padding: 1.2vh 1vh; }
+.o-field.code input { width: 54vh; font-size: 6.4vh; letter-spacing: 0.3em; text-indent: 0.3em; text-align: center; padding: 1.2vh 1vh; }
 .o-msg { position: absolute; left: 6vw; bottom: 14vh; font-size: 2.6vh; letter-spacing: 0.1em; color: var(--cyan); max-width: 80vw; }
 .o-msg.bad { color: var(--hot); }
 .o-room { position: absolute; left: 6vw; top: 17vh; font-size: 2.6vh; letter-spacing: 0.2em; opacity: 0.9; display: flex; align-items: baseline; gap: 2vh; }
@@ -614,3 +614,37 @@ body.touch #tc.on { display: block; position: absolute; inset: 0; pointer-events
 .o-hudping.show { opacity: 1; }
 .o-card.me { border-left-color: var(--cyan); }
 #s-lobby .o-msg { bottom: 5vh; }
+
+/* ---------- feedback (feedback.js) ---------- */
+.fb-corner { position: absolute; right: calc(3vw + var(--sr, 0px)); bottom: calc(4vh + var(--sb, 0px)); display: flex; gap: 1vh; pointer-events: auto; }
+.fb-chip { font: inherit; font-size: 1.7vh; letter-spacing: 0.25em; color: rgba(255,255,255,0.75); background: rgba(8,9,14,0.55); border: 1px solid rgba(255,255,255,0.18); padding: 0.7vh 1.4vh; cursor: pointer; text-decoration: none; transform: skewX(-12deg); }
+.fb-chip:hover, .fb-chip:focus-visible { color: #fff; border-color: var(--hot); outline: none; }
+#s-feedback { background: rgba(0,0,0,0.78); }
+.fb-form { position: absolute; left: 6vw; top: 18vh; width: min(88vw, 110vh); display: flex; flex-direction: column; gap: 1.4vh; pointer-events: auto; }
+.fb-kinds { display: flex; gap: 1vh; }
+.fb-kinds button, .fb-buttons button { font: inherit; font-size: 2.4vh; letter-spacing: 0.15em; font-style: italic; color: #fff; background: var(--panel); border: 1px solid rgba(255,255,255,0.2); padding: 0.8vh 2.4vh; cursor: pointer; transform: skewX(-12deg); }
+.fb-kinds button[aria-checked="true"] { background: var(--grad); border-color: transparent; color: #12060a; }
+.fb-form textarea { font: inherit; font-size: 2.4vh; font-variation-settings: 'wdth' 85, 'wght' 400; color: #fff; background: rgba(8,9,14,0.85); border: 0.3vh solid rgba(255,255,255,0.25); padding: 1.4vh 1.8vh; height: 26vh; resize: none; user-select: text; outline: none; }
+.fb-form textarea:focus { border-color: var(--hot); box-shadow: 0 0 3vh rgba(255,45,85,0.3); }
+.fb-row { display: flex; gap: 3vh; font-size: 1.9vh; letter-spacing: 0.1em; }
+.fb-row span:first-child { opacity: 0.55; font-variant-numeric: tabular-nums; }
+.fb-msg { color: var(--cyan); }
+.fb-msg.bad { color: var(--hot); }
+.fb-note { font-size: 1.9vh; line-height: 1.45; opacity: 0.75; max-width: 95vh; font-variation-settings: 'wdth' 85, 'wght' 400; }
+.fb-note a { color: var(--yellow); }
+.fb-buttons { display: flex; gap: 1.4vh; margin-top: 0.6vh; }
+.fb-buttons .fb-send { background: var(--grad); border-color: transparent; color: #12060a; font-variation-settings: 'wdth' 75, 'wght' 800; }
+.fb-buttons button:disabled { opacity: 0.5; cursor: default; }
+.fb-kinds button:focus-visible, .fb-buttons button:focus-visible { outline: 0.3vh solid var(--yellow); }
+body.touch .fb-form { top: 14vh; }
+body.touch .fb-form textarea { height: 22vh; font-size: 3.6vh; }
+body.touch .fb-note, body.touch .fb-row { font-size: 3vh; }
+body.touch .fb-kinds button, body.touch .fb-buttons button { font-size: 3.6vh; padding: 1vh 3vh; }
+body.touch .fb-chip { font-size: 2.8vh; padding: 1vh 2vh; }
+
+/* ---------- recording (recorder.js) ---------- */
+.rec-dot { position: absolute; top: calc(2.4vh + var(--st, 0px)); left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 0.8vh; padding: 0.5vh 1.4vh; background: rgba(8,9,14,0.6); font-size: 1.8vh; letter-spacing: 0.2em; z-index: 5; pointer-events: none; }
+.rec-dot.show { display: flex; }
+.rec-dot i { width: 1.2vh; height: 1.2vh; border-radius: 50%; background: #ff2d40; animation: blink 1s infinite; }
+.rec-dot b { font-weight: inherit; font-variant-numeric: tabular-nums; opacity: 0.8; }
+body.touch .rec-dot { font-size: 2.6vh; }

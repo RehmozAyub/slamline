@@ -119,7 +119,7 @@ function migrateStorage() {
 }
 
 export function loadSettings() {
-  const def = { quality: 'auto', autoQ: null, steering: 'slider', vibration: true, motionBlur: true, mirror: true, master: 0.8, music: 0.55, assist: true, assist2: true, cars: 8, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
+  const def = { quality: 'auto', autoQ: null, steering: 'slider', vibration: true, motionBlur: true, mirror: true, shareStats: true, master: 0.8, music: 0.55, assist: true, assist2: true, cars: 8, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
   migrateStorage();
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');

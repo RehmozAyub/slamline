@@ -8,7 +8,7 @@
 // `--notes "text"` puts a summary above the change list. `--dry-run` runs the checks and tests and
 // prints the plan without building or publishing anything.
 import { execSync } from 'node:child_process';
-import { existsSync, statSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync, readFileSync, mkdtempSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +53,7 @@ const tag = `v${version}`;
 if (!/^\d+\.\d+$/.test(version)) fail(`version "${version}" should look like 2.5`);
 if (sh(`git tag -l ${tag}`)) fail(`${tag} already exists.`);
 
-const changes = sh(`git log ${lastTag}..HEAD --no-merges --format="- %s"`);
+const changes = sh(`git log ${lastTag}..HEAD --no-merges --format="- %s"`).split('\n').filter((l) => !/^- Version \d+\.\d+$/.test(l)).join('\n');
 if (!changes) fail(`nothing new since ${lastTag}.`);
 const summary = flag('--notes');
 const notes = [
@@ -70,6 +70,16 @@ run('npm test');
 if (dryRun) {
   console.log(`\nDry run: would build the exe and apk, push main and Pages, and publish ${tag} with these notes:\n\n${notes}`);
   process.exit(0);
+}
+
+// the game carries its version (stats.js / feedback.js): committed as its own "Version X.Y"
+const versionFile = join(root, 'game', 'src', 'version.js');
+const versionSrc = readFileSync(versionFile, 'utf8');
+const versionNew = versionSrc.replace(/VERSION = '[^']*'/, `VERSION = '${version}'`);
+if (versionNew !== versionSrc) {
+  step(`Setting the game's version to ${version}`);
+  writeFileSync(versionFile, versionNew);
+  run(`git commit -q -m "Version ${version}" -- game/src/version.js`);
 }
 
 const started = Date.now() - 1000;

@@ -47,7 +47,8 @@ export class Input {
       // typing in a text field (online name / room code): the keys are the field's, except the
       // ones that move through the menu
       const t = e.target;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && !FIELD_PASS.includes(e.code)) return;
+      // (a multi-line box keeps the arrows and Enter too: only Escape leaves it)
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && !(t.tagName === 'TEXTAREA' ? e.code === 'Escape' : FIELD_PASS.includes(e.code))) return;
       if (e.repeat) {
         if (MENU_KEYS[e.code] && ['up', 'down', 'left', 'right'].includes(MENU_KEYS[e.code])) this.emit(MENU_KEYS[e.code], e.code);
         e.preventDefault();

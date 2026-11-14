@@ -1,6 +1,6 @@
 // Electron shell for SLAMLINE: serves the game from a privileged app:// protocol
 // (ES modules don't load reliably from file://) and prefers the discrete GPU.
-const { app, BrowserWindow, protocol, net, Menu, session } = require('electron');
+const { app, BrowserWindow, protocol, net, Menu, session, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -41,6 +41,14 @@ app.whenReady().then(async () => {
     return new Response(res.body, { status: res.status, headers });
   });
 
+  // videos from RECORD (recorder.js) go straight into Videos\SLAMLINE
+  session.defaultSession.on('will-download', (e, item) => {
+    if (!/\.(mp4|webm)$/i.test(item.getFilename())) return;
+    const dir = path.join(app.getPath('videos'), 'SLAMLINE');
+    fs.mkdirSync(dir, { recursive: true });
+    item.setSavePath(path.join(dir, item.getFilename()));
+  });
+
   Menu.setApplicationMenu(null);
   const win = new BrowserWindow({
     width: 1600,
@@ -51,6 +59,12 @@ app.whenReady().then(async () => {
     autoHideMenuBar: true,
     webPreferences: { backgroundThrottling: false },
   });
+  // links (GitHub issues, the privacy notice) open in the normal browser, never inside the game
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('app://')) { e.preventDefault(); if (/^https:\/\//.test(url)) shell.openExternal(url); } });
   win.maximize();
   win.once('ready-to-show', () => win.show());
   win.webContents.on('before-input-event', (e, input) => {
