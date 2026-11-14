@@ -1,8 +1,9 @@
 // Ships the committed game everywhere in one go: `npm run release`
 //   1. checks: on main, nothing uncommitted, not behind GitHub, tests pass
-//   2. builds release/Slamline.exe and release/Slamline.apk (before anything goes public)
+//   2. builds release/Slamline.exe and release/Slamline.apk (before anything goes public; the apk
+//      is only for your own phone and is never uploaded)
 //   3. pushes main, publishes game/ to the gh-pages branch (the Pages site)
-//   4. creates GitHub release vX.Y with the exe and the apk attached
+//   4. creates GitHub release vX.Y with the exe attached
 // The version is the latest release tag plus one minor step (v2.4 -> v2.5); `--version 3.0` overrides it.
 // `--notes "text"` puts a summary above the change list. `--dry-run` runs the checks and tests and
 // prints the plan without building or publishing anything.
@@ -58,7 +59,7 @@ const summary = flag('--notes');
 const notes = [
   summary,
   `**What's new since ${lastTag}**\n\n${changes}`,
-  '- `Slamline.exe`: Windows, portable (no install).\n- `Slamline.apk`: Android. Installs over the previous version and keeps progress.',
+  '- `Slamline.exe`: Windows, portable (no install).',
   `Play in the browser: ${PAGES}`,
 ].filter(Boolean).join('\n\n') + '\n';
 console.log(`Releasing ${tag} (last release ${lastTag}), commit ${sh('git rev-parse --short HEAD')}`);
@@ -82,9 +83,9 @@ step('Building the Windows exe');
 run('node tools/build.mjs');
 const exe = built('Slamline.exe');
 
-step('Building the Android apk');
+step('Building the Android apk (stays in release/, not published)');
 run('node tools/build-apk.mjs', { SLAMLINE_VERSION: version });
-const apk = built('Slamline.apk');
+built('Slamline.apk');
 
 step('Pushing main to GitHub');
 run('git push origin main');
@@ -96,7 +97,7 @@ run(`git push origin ${pages}:refs/heads/gh-pages`);
 step(`Creating GitHub release ${tag}`);
 const notesFile = join(mkdtempSync(join(tmpdir(), 'slamline-release-')), 'notes.md');
 writeFileSync(notesFile, notes);
-run(`gh release create ${tag} "${exe}" "${apk}" --repo ${REPO} --target main --title "SLAMLINE ${tag}" --notes-file "${notesFile}"`);
+run(`gh release create ${tag} "${exe}" --repo ${REPO} --target main --title "SLAMLINE ${tag}" --notes-file "${notesFile}"`);
 sh('git fetch origin --tags --quiet');
 
 console.log(`\nShipped ${tag}:\n  Pages:   ${PAGES} (live in a minute or two)\n  Release: https://github.com/${REPO}/releases/tag/${tag}`);
