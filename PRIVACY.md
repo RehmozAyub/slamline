@@ -2,13 +2,13 @@
 
 SLAMLINE is a free game made for fun by Rehmoz Ayub. It collects as little as it can: no accounts, no cookies, no advertising, and nothing that identifies you.
 
-This page covers the web version (https://rehmozayub.github.io/slamline/) and the Windows exe. Questions or requests: open an issue at https://github.com/RehmozAyub/slamline/issues.
+This page covers the web version (https://rehmozayub.github.io/slamline/, and the same game on itch.io) and the Windows exe. Questions or requests: open an issue at https://github.com/RehmozAyub/slamline/issues.
 
 ## Play stats
 
 To see how many people play, from which countries and how long, the game sends anonymous numbers to SLAMLINE's own small server (running on Cloudflare) every few minutes while it's open:
 
-- the game version and the kind of device (browser on a computer, browser on a phone or tablet, or the Windows exe)
+- the game version and the kind of device (browser on a computer, browser on a phone or tablet, on itch.io or not, or the Windows exe)
 - how many seconds the game was open and how many of them you were actually playing
 - races started, finished and quit, with the track, the mode (solo, split screen, online) and whether the track was mirrored
 - for online play: rooms hosted, players per room and failed connections
@@ -47,7 +47,7 @@ Your settings, best laps, stars and unlocked paints are saved in your browser's 
 
 ## Hosting
 
-The web version and the downloads are hosted on GitHub, which keeps its own logs (see https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
+The web version and the downloads are hosted on GitHub, which keeps its own logs (see https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). On itch.io the game is hosted by itch.io, which has its own privacy policy (https://itch.io/docs/legal/privacy-policy).
 
 ## Legal basis
 

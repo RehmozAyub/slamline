@@ -9,7 +9,10 @@
 // which carries a key the release script adds at build time (never in the repository).
 import DASHBOARD from './dashboard.html';
 
-const PLATFORMS = ['web-desktop', 'web-phone', 'exe'];
+const PLATFORMS = ['web-desktop', 'web-phone', 'itch-desktop', 'itch-phone', 'exe'];
+// the game's copy on itch.io runs from itch's own hosts (shared by every itch.io game)
+const ITCH = /^https:\/\/(html(-classic)?\.itch\.zone|v6p9d9t4\.ssl\.hwcdn\.net)$/;
+const web = (origin, env) => origin === env.PAGES_ORIGIN || ITCH.test(origin || '');
 const TRACKS = ['coast', 'city', 'alpine', 'snow', 'canyon', 'jungle', 'canal', 'space', 'airport', 'volcano'];
 const MODES = ['solo', 'split', 'online'];
 const QUALITIES = ['low', 'medium', 'high'];
@@ -49,12 +52,12 @@ export default {
 // --- who may send ---------------------------------------------------------------------------
 // (the game posts as text/plain, a simple request, so the exe's key rides in the body as "bk")
 function official(origin, body, env) {
-  if (origin === env.PAGES_ORIGIN) return true;
+  if (web(origin, env)) return true;
   return origin === 'app://game' && !!env.BUILD_KEY && body.bk === env.BUILD_KEY;
 }
 
 function cors(origin, env) {
-  const ok = origin === env.PAGES_ORIGIN || origin === 'app://game';
+  const ok = web(origin, env) || origin === 'app://game';
   return ok ? { 'access-control-allow-origin': origin, vary: 'origin' } : {};
 }
 
