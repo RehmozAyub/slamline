@@ -5,11 +5,21 @@ import { MAPS } from './maps/index.js';
 import { CARS, PAINTS, saveSettings, clampCars, CAR_COUNT } from './config.js';
 import { host, join, onTick } from './net/peer.js';
 import { Online, NET_VERSION, MAX_PLAYERS } from './net/online.js';
-import { CODE_CHARS } from './net/protocol.js';
+import { CODE_CHARS, CODE_LEN } from './net/protocol.js';
+import { playerId } from './net/guard.js';
 
 const NAME_MAX = 12;
 export const cleanName = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9 _.\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
-const cleanCode = (s) => String(s || '').toUpperCase().split('').filter((c) => CODE_CHARS.includes(c)).join('').slice(0, 4);
+const carIndex = (v) => (Number.isInteger(v) && v >= 0 && v < CARS.length ? v : 0);
+const paintIndex = (v) => (Number.isInteger(v) && v >= 0 && v < PAINTS.length ? v : 0);
+// the host's 'start' message, checked: null if it can't be a real one
+function startMessage(m) {
+  if (!Array.isArray(m.players) || !m.players.length || m.players.length > MAX_PLAYERS) return null;
+  const players = m.players.map((p) => p && playerId(p.id) && { id: p.id, name: cleanName(p.name) || 'PLAYER', carIndex: carIndex(p.carIndex), paintIndex: paintIndex(p.paintIndex) });
+  if (players.some((p) => !p) || !Number.isInteger(m.track) || m.track < 0 || m.track >= MAPS.length || !Number.isInteger(m.seed)) return null;
+  return { type: 'start', track: m.track, random: !!m.random, seed: m.seed, cars: clampCars(m.cars), players };
+}
+const cleanCode = (s) => String(s || '').toUpperCase().split('').filter((c) => CODE_CHARS.includes(c)).join('').slice(0, CODE_LEN);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const hex = (p) => '#' + (PAINTS[p] || PAINTS[0]).hex.toString(16).padStart(6, '0');
 const idNum = (id) => Number(String(id).slice(1));
@@ -55,14 +65,14 @@ export class OnlineFlow {
     </section>`);
     add(`<section id="s-join" class="screen">
       <h1 class="head"><b>JOIN</b> A ROOM</h1>
-      <label class="o-field code"><span>ROOM CODE</span><input id="o-code" type="text" maxlength="4" spellcheck="false" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="····"></label>
+      <label class="o-field code"><span>ROOM CODE</span><input id="o-code" type="text" maxlength="6" spellcheck="false" autocomplete="off" autocapitalize="characters" enterkeyhint="go" placeholder="······"></label>
       <div class="menu" id="m-join"></div>
       <div class="o-msg" id="o-jmsg"></div>
-      <div class="hints">TYPE THE 4-LETTER CODE THE HOST SEES &nbsp;·&nbsp; ENTER JOIN &nbsp;·&nbsp; ESC BACK</div>
+      <div class="hints">TYPE THE 6-CHARACTER CODE THE HOST SEES &nbsp;·&nbsp; ENTER JOIN &nbsp;·&nbsp; ESC BACK</div>
     </section>`);
     add(`<section id="s-lobby" class="screen">
       <h1 class="head"><b>ONLINE</b> LOBBY</h1>
-      <div class="o-room">ROOM CODE <b id="o-codeshow">····</b><em id="o-ping"></em></div>
+      <div class="o-room">ROOM CODE <b id="o-codeshow">······</b><em id="o-ping"></em></div>
       <div class="o-players" id="o-players"></div>
       <div class="menu" id="m-lobby"></div>
       <div class="o-msg" id="o-lmsg"></div>
@@ -132,7 +142,7 @@ export class OnlineFlow {
     if (this.busy) return;
     if (i === 1) { this.open(); return; }
     const code = cleanCode(this.$('#o-code').value);
-    if (code.length !== 4) { this.msg('#o-jmsg', 'THE CODE HAS 4 LETTERS', true); return; }
+    if (code.length !== CODE_LEN) { this.msg('#o-jmsg', `THE CODE HAS ${CODE_LEN} CHARACTERS`, true); return; }
     this.busy = true;
     this.msg('#o-jmsg', `CONNECTING TO ${code}…`);
     try {
@@ -146,6 +156,7 @@ export class OnlineFlow {
       this.openLobby();
     } catch (e) {
       this.msg('#o-jmsg', e.text || "CAN'T CONNECT ON THIS NETWORK", true);
+      if (!e.code || e.code === 'network') this.game.stats.connectFailed();
     }
     this.busy = false;
   }
@@ -160,11 +171,14 @@ export class OnlineFlow {
       this.roster = [{ id: 'p0', ...this.mine() }];
       this.room = await host((link) => this.onGuest(link), (e) => this.msg('#o-lmsg', e.text, true));
       this.code = this.room.code;
+      this.counted = false; // players per room go into the play stats at its first race
+      this.game.stats.roomHosted();
       this.openLobby();
     } catch (e) {
       this.net = null;
       this.role = null;
       this.msg('#o-msg', e.text || "CAN'T REACH THE ONLINE SERVICE", true);
+      this.game.stats.connectFailed();
     }
     this.busy = false;
   }
@@ -204,7 +218,7 @@ export class OnlineFlow {
     g.state = 'lobby';
     g.players = 1;
     this.ui.show('lobby');
-    this.$('#o-codeshow').textContent = this.code || '····';
+    this.$('#o-codeshow').textContent = this.code || '······';
     this.index.lobby = Math.min(this.index.lobby, this.lobbyItems().length - 1);
     this.renderLobby();
     this.lobbyNote(note);
@@ -229,6 +243,7 @@ export class OnlineFlow {
         { label: 'TRACK', value: `‹ ${trackName} ›` },
         { label: 'CARS', value: `‹ ${this.roomCars()} ›` },
         { label: 'CAR', value: CARS[this.game.sel.car].name },
+        ...(this.others.length ? [{ label: 'KICK', value: `‹ ${this.kickTarget().name} ›` }] : []),
         { label: 'LEAVE' },
       ];
     }
@@ -246,8 +261,33 @@ export class OnlineFlow {
     this.$('#o-ping').textContent = this.net && this.net.pingMs ? `PING ${this.net.pingMs} MS` : '';
   }
 
+  // host: the guest KICK points at (left / right picks another)
+  kickTarget() {
+    const list = this.others;
+    this.kickIdx = ((this.kickIdx || 0) % list.length + list.length) % list.length;
+    return list[this.kickIdx];
+  }
+
+  cycleKick(d) {
+    this.kickIdx = (this.kickIdx || 0) + d;
+    this.game.audio.blip(600, 0.03, 0.06);
+    this.renderLobby();
+  }
+
+  // host: send a guest out of the room (they can come back only with the code)
+  kick() {
+    const p = this.kickTarget();
+    if (!p || !this.net) return;
+    this.net.sendTo(p.id, { type: 'kicked' });
+    setTimeout(() => { if (this.net) this.net.dropLink(p.id); }, 200);
+    this.onLeft(p.id);
+    this.lobbyNote(`${p.name} WAS REMOVED`, true);
+  }
+
+  lobbyKeys() { return this.role === 'host' ? ['start', 'track', 'cars', 'car', ...(this.others.length ? ['kick'] : []), 'leave'] : ['track', 'cars', 'car', 'leave']; }
+
   lobbySelect(i, e) {
-    const g = this.game, key = this.role === 'host' ? ['start', 'track', 'cars', 'car', 'leave'][i] : ['track', 'cars', 'car', 'leave'][i];
+    const g = this.game, key = this.lobbyKeys()[i];
     const half = () => { const r = e && e.target.closest('em') ? e.target.closest('em').getBoundingClientRect() : null; return r && e.clientX < (r.left + r.right) / 2 ? -1 : 1; };
     if (key === 'start') {
       if (this.roster.length < 2) { this.lobbyNote(''); g.audio.blip(300, 0.06, 0.08); return; }
@@ -261,6 +301,10 @@ export class OnlineFlow {
     } else if (key === 'car') {
       g.audio.blip(900, 0.06, 0.1);
       g.showCars(0);
+    } else if (key === 'kick') {
+      if (this.role !== 'host') return;
+      if (e && e.target.closest('em')) this.cycleKick(half());
+      else this.kick();
     } else if (key === 'leave') this.leave();
   }
 
@@ -307,6 +351,7 @@ export class OnlineFlow {
       if (a === 'up' || a === 'down') { move('lobby', n, a === 'up' ? -1 : 1); this.renderLobby(); }
       if ((a === 'left' || a === 'right') && this.role === 'host' && this.index.lobby === 1) this.cycleTrack(a === 'left' ? -1 : 1);
       if ((a === 'left' || a === 'right') && this.role === 'host' && this.index.lobby === 2) this.cycleCars(a === 'left' ? -1 : 1);
+      if ((a === 'left' || a === 'right') && this.lobbyKeys()[this.index.lobby] === 'kick') this.cycleKick(a === 'left' ? -1 : 1);
       if (a === 'confirm' && code !== 'Space') this.lobbySelect(this.index.lobby);
       if (a === 'back') this.leave();
     }
@@ -318,7 +363,7 @@ export class OnlineFlow {
     if (this.role === 'host') {
       if (m.type === 'hello') {
         if (m.v !== NET_VERSION) { this.net.sendTo(from, { type: 'refuse', why: 'version' }); setTimeout(() => this.net && this.net.dropLink(from), 200); return; }
-        const p = { id: from, name: cleanName(m.name) || `PLAYER ${idNum(from) + 1}`, car: m.car | 0, paint: m.paint | 0 };
+        const p = { id: from, name: cleanName(m.name) || `PLAYER ${idNum(from) + 1}`, car: carIndex(m.car), paint: paintIndex(m.paint) };
         this.roster = this.roster.filter((q) => q.id !== from).concat(p).sort((a, b) => idNum(a.id) - idNum(b.id));
         this.net.sendTo(from, { type: 'welcome', id: from, racing: !!(g.session && g.session.online) });
         this.broadcastRoster();
@@ -327,25 +372,31 @@ export class OnlineFlow {
         else if (g.session && g.session.online) g.session.popupAll(`${p.name} JOINED`, 'JOINS THE NEXT RACE');
       } else if (m.type === 'me') {
         const p = this.roster.find((q) => q.id === from);
-        if (p) Object.assign(p, { name: cleanName(m.name) || p.name, car: m.car | 0, paint: m.paint | 0 });
+        if (p) Object.assign(p, { name: cleanName(m.name) || p.name, car: carIndex(m.car), paint: paintIndex(m.paint) });
         this.broadcastRoster();
         this.renderLobby();
       } else if (m.type === 'bye') { this.net.dropLink(from); this.onLeft(from); }
       return;
     }
     // guest
-    if (m.type === 'welcome') { this.net.me = m.id; this.inRace = !!m.racing; if (g.state === 'lobby') { this.renderLobby(); this.lobbyNote(''); } }
+    if (m.type === 'welcome') { if (!playerId(m.id)) return; this.net.me = m.id; this.inRace = !!m.racing; if (g.state === 'lobby') { this.renderLobby(); this.lobbyNote(''); } }
     else if (m.type === 'roster') {
-      this.roster = (m.players || []).map((p) => ({ id: p.id, name: cleanName(p.name) || 'PLAYER', car: p.car | 0, paint: p.paint | 0 }));
-      this.hostTrack = m.track | 0;
+      this.roster = (Array.isArray(m.players) ? m.players.slice(0, MAX_PLAYERS) : []).filter((p) => p && playerId(p.id)).map((p) => ({ id: p.id, name: cleanName(p.name) || 'PLAYER', car: carIndex(p.car), paint: paintIndex(p.paint) }));
+      this.hostTrack = Math.min(MAPS.length, Math.max(0, m.track | 0));
       this.cars = clampCars(m.cars);
       if (g.state === 'lobby') { this.renderLobby(); this.lobbyNote(''); }
     } else if (m.type === 'refuse') {
       this.disconnect();
       this.open();
       this.msg('#o-msg', m.why === 'full' ? `THAT ROOM IS FULL (${MAX_PLAYERS} PLAYERS)` : 'THE HOST HAS A DIFFERENT VERSION OF THE GAME', true);
+    } else if (m.type === 'kicked') {
+      this.disconnect();
+      this.open();
+      this.msg('#o-msg', 'THE HOST REMOVED YOU FROM THE ROOM', true);
     } else if (m.type === 'start') {
-      if (m.players.some((p) => p.id === this.me)) this.raceStart(m);
+      const start = startMessage(m);
+      if (!start) return;
+      if (start.players.some((p) => p.id === this.me)) this.raceStart(start);
       else { this.inRace = true; if (g.state === 'lobby') this.lobbyNote(''); } // started before we joined
     } else if (m.type === 'tolobby') {
       this.inRace = false;
@@ -436,7 +487,11 @@ export class OnlineFlow {
     g.ui.fade(false);
   }
 
-  pauseItems() { return [{ key: 'resume', label: 'RESUME' }, { key: 'assist0', label: 'DRIVE ASSIST', value: this.game.assistOn(0) ? 'ON' : 'OFF' }, { key: 'settings', label: 'SETTINGS' }, { key: 'quit', label: 'LEAVE RACE' }]; }
+  pauseItems() {
+    const g = this.game, items = [{ key: 'resume', label: 'RESUME' }, { key: 'assist0', label: 'DRIVE ASSIST', value: g.assistOn(0) ? 'ON' : 'OFF' }];
+    if (g.recorder.supported) items.push(g.recordItem());
+    return items.concat({ key: 'settings', label: 'SETTINGS' }, { key: 'quit', label: 'LEAVE RACE' });
+  }
 
   // every frame
   frame() {
