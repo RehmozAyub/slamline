@@ -14,7 +14,9 @@ const run = (cmd) => execSync(cmd, { cwd: build, stdio: 'inherit' });
 const pkg = JSON.parse(readFileSync(join(root, 'electron', 'package.json'), 'utf8'));
 if (!existsSync(join(build, 'node_modules', 'electron')) || !existsSync(join(build, 'node_modules', 'electron-builder'))) {
   writeFileSync(join(build, 'package.json'), JSON.stringify({ ...pkg, devDependencies: {} }, null, 2));
-  run('npm install --save-dev electron electron-builder --no-audit --no-fund');
+  // a fixed Electron, so a fresh build folder reuses the one already downloaded (a new major
+  // means a fresh 160 MB download, and the exe changing under the players)
+  run('npm install --save-dev electron@44.4.5 electron-builder --no-audit --no-fund');
 }
 const ver = (m) => JSON.parse(readFileSync(join(build, 'node_modules', m, 'package.json'), 'utf8')).version;
 pkg.devDependencies = { electron: ver('electron'), 'electron-builder': ver('electron-builder') };
