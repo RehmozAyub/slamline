@@ -14,11 +14,13 @@
 import * as THREE from 'three';
 import { NetClock } from './clock.js';
 import { packStates, unpackStates, carState, FLAG } from './protocol.js';
+import { Gate, smallMessage, num, playerId, label, results } from './guard.js';
 import { RemoteCar, History, SMOOTH } from './remoteCar.js';
 import { HitJudge, plausibleContact } from './hits.js';
 import { AIDriver } from '../ai.js';
+import { POWER_IDS } from '../powerups.js';
 
-export const NET_VERSION = 2; // bump when the protocol changes; everyone needs the same
+export const NET_VERSION = 3; // bump when the protocol changes; everyone needs the same
 export const MAX_PLAYERS = 8;
 const SEND_RATE = 60; // car states per second
 const CLAIM_GAP = 0.4; // s between two hit claims from this device
@@ -39,10 +41,13 @@ export class Online {
 
   // host: a guest's link (id p1..p7); guest: the host's link (id p0)
   addLink(id, link) {
-    const entry = { id, link, clock: this.role === 'host' ? new NetClock(true) : this.clock };
+    // flood guards: a guest sends a few events and 60 car states a second; the host also
+    // passes on everyone else's, so a guest hears up to 8 x 60
+    const gates = { msg: new Gate(60, 240), state: new Gate(600, 1200), hit: new Gate(4, 12) };
+    const entry = { id, link, gates, clock: this.role === 'host' ? new NetClock(true) : this.clock };
     this.links.set(id, entry);
-    link.onMessage = (m) => this.onMessage(m, id);
-    link.onState = (b) => this.onStateBuf(b, id);
+    link.onMessage = (m) => { if (gates.msg.pass() && smallMessage(m)) this.onMessage(m, id); };
+    link.onState = (b) => { if (gates.state.pass()) this.onStateBuf(b, id); };
     link.onClose = () => this.linkClosed(id);
   }
 
@@ -102,8 +107,12 @@ export class Online {
     if (m.type === 'ping') { if (e) e.link.send(e.clock.reply(m)); return; }
     if (m.type === 'pong') { if (e) e.clock.onPong(m); return; }
     if (this.role === 'host') m.from = from; // a guest can only speak for itself
-    else m.from = m.from || 'p0';
+    else m.from = playerId(m.from) || 'p0';
+    if (m.to !== undefined && !playerId(m.to)) return;
     if (m.race !== undefined) {
+      if (!Number.isInteger(m.race)) return;
+      // takedowns and pushes from one player at a time, not a stream of them
+      if ((m.type === 'wreck' || m.type === 'credit' || m.type === 'push' || m.type === 'claim') && e && !e.gates.hit.pass()) return;
       if (this.role === 'host') {
         if (m.to && m.to !== 'p0') { this.sendTo(m.to, m); return; } // for another guest
         if (!m.to) this.sendExcept(from, m); // for everyone
@@ -240,11 +249,16 @@ export class Online {
   }
 
   onStateBuf(buf, from) {
-    if (this.role === 'host') for (const e of this.links.values()) if (e.id !== from) e.link.sendState(buf); // pass a guest's car on
     const S = this.session;
-    if (!S) return;
     const msg = unpackStates(buf);
-    if (!msg || msg.t < this.startedAt - 1) return; // from the previous race
+    if (!msg) return;
+    // host: a guest may only move its own car; then it's passed on to the others
+    if (this.role === 'host') {
+      if (S && msg.states.some((st) => !S.cars[st.idx] || S.cars[st.idx].owner !== from)) return;
+      for (const e of this.links.values()) if (e.id !== from) e.link.sendState(buf);
+    }
+    if (!S) return;
+    if (msg.t < this.startedAt - 1) return; // from the previous race
     const now = this.now;
     for (const st of msg.states) {
       const rc = this.remote.get(st.idx);
@@ -314,61 +328,71 @@ export class Online {
   finished(time) { this.rsend({ type: 'finish', time }, 'p0'); }
 
   raceMessage(m) {
-    const S = this.session, car = (i) => (i >= 0 ? S.cars[i] : null);
-    const sc = (i) => (i >= 0 && S.shortcuts ? S.shortcuts.list[i] : null);
+    const S = this.session, car = (i) => (Number.isInteger(i) && i >= 0 && i < S.cars.length ? S.cars[i] : null);
+    const sc = (i) => (Number.isInteger(i) && i >= 0 && S.shortcuts && i < S.shortcuts.list.length ? S.shortcuts.list[i] : null);
+    const item = (i) => (Number.isInteger(i) && i >= 0 && i < S.pickState.items.length ? S.pickState.items[i] : null);
+    const unit = (v) => num(v, -1, 1);
+    const L = S.track.length;
     switch (m.type) {
       case 'loaded':
         if (this.role !== 'host') break;
         this.loaded.add(m.from);
         if (this.goAt !== null) this.rsend({ type: 'go', at: this.goAt }, m.from); else this.tryGo();
         break;
-      case 'go': this.goAt = m.at; break;
-      case 'claim': if (this.judge) this.judgeClaim({ ...m.claim, from: m.from }); break;
+      case 'go': if (this.role !== 'host' && m.from === 'p0') this.goAt = num(m.at, this.now - 60, this.now + 60, this.now + GO_DELAY); break;
+      case 'claim': {
+        const cl = m.claim;
+        if (!this.judge || !cl || typeof cl !== 'object') break;
+        const attacker = playerId(cl.attacker), victim = playerId(cl.victim);
+        if (!attacker || !victim || attacker === victim) break;
+        this.judgeClaim({ from: m.from, t: num(cl.t, this.now - 5, this.now + 1, this.now), attacker, victim, kind: cl.kind === 'takedown' ? 'takedown' : 'push', nx: unit(cl.nx), nz: unit(cl.nz), closing: num(cl.closing, 0, 200) });
+        break;
+      }
       case 'push': { const c = car(m.car); if (c && !c.remote) { c.pushedAt = S.time; c.pushedBy = car(m.by); } break; }
       case 'wreck': {
         const c = car(m.car);
-        if (c && !c.remote) S.takedown(c, m.dx, m.dz, m.label, m.quiet, car(m.by), true);
+        if (c && !c.remote) S.takedown(c, unit(m.dx), unit(m.dz), label(m.label), !!m.quiet, car(m.by), true);
         break;
       }
       case 'credit': {
         const by = car(m.by), c = car(m.car);
         if (!by || by.remote || !c) break;
         by.kills = (by.kills || 0) + 1;
-        if (by.human) S.credit(by.human, c, m.label, m.quiet);
+        if (by.human) S.credit(by.human, c, label(m.label), !!m.quiet);
         break;
       }
       case 'take': {
-        const it = S.pickState.items[m.id];
+        const it = item(m.id);
         if (this.role === 'host' && it && it.active) { S.takePickup(it); } // takePickup tells everyone
         break;
       }
       case 'item': {
-        const it = S.pickState.items[m.id];
-        if (!it) break;
-        if (m.on && m.power) it.power = m.power;
+        const it = item(m.id);
+        if (!it || m.from !== 'p0') break;
+        if (m.on && POWER_IDS.includes(m.power)) it.power = m.power;
         it.active = m.on;
         S.pickVis.setActive(it, m.on);
         break;
       }
       case 'shot': {
-        if (S.shots.some((s) => s.id === m.id) || !car(m.owner)) break;
-        S.addShot({ id: m.id, owner: car(m.owner), sc: sc(m.sc), s: m.s, lat: m.lat, vs: m.vs, vl: m.vl, t: 0 });
+        if (typeof m.id !== 'string' || m.id.length > 24 || S.shots.some((s) => s.id === m.id) || !car(m.owner)) break;
+        S.addShot({ id: m.id, owner: car(m.owner), sc: sc(m.sc), s: num(m.s, 0, L), lat: num(m.lat, -40, 40), vs: num(m.vs, -200, 200), vl: num(m.vl, -50, 50), t: 0 });
         const vol = S.audibility(car(m.owner).vehicle);
         if (vol > 0.02) S.game.audio.fire(vol);
         break;
       }
       case 'shotEnd': S.removeShot(m.id, true); break;
       case 'slick': {
-        if (S.slicks.some((s) => s.id === m.id) || !car(m.owner)) break;
-        S.addSlick({ id: m.id, owner: car(m.owner), sc: sc(m.sc), s: m.s, lat: m.lat, t: m.t });
+        if (typeof m.id !== 'string' || m.id.length > 24 || S.slicks.some((s) => s.id === m.id) || !car(m.owner)) break;
+        S.addSlick({ id: m.id, owner: car(m.owner), sc: sc(m.sc), s: num(m.s, 0, L), lat: num(m.lat, -40, 40), t: num(m.t, 0, 60) });
         const vol = S.audibility(car(m.owner).vehicle);
         if (vol > 0.02) S.game.audio.splat(vol);
         break;
       }
-      case 'fx': this.showFx(m.fx); break;
-      case 'left': this.takeOver(m.id); break;
+      case 'fx': if (m.fx && typeof m.fx === 'object') this.showFx(m.fx); break;
+      case 'left': if (m.from === 'p0' && playerId(m.id)) this.takeOver(m.id); break;
       case 'finish': break; // the race tracker sees the line crossing from the car states
-      case 'results': if (this.handlers.onResults) this.handlers.onResults(m.list); break;
+      case 'results': if (m.from === 'p0' && this.handlers.onResults) this.handlers.onResults(results(m.list)); break;
       default: break;
     }
   }
@@ -376,12 +400,13 @@ export class Online {
   showFx(fx) {
     const S = this.session;
     if (fx.kind === 'shockwave') {
+      if (![fx.x, fx.y, fx.z].every((v) => Number.isFinite(v) && Math.abs(v) < 2e4)) return;
       S.pickVis.shockwave(fx.x, fx.y, fx.z);
       S.fx.sparks(fx.x, fx.y + 0.6, fx.z, 0, 0, 50, 2);
       const vol = S.audibility(fx);
       if (vol > 0.02) S.game.audio.shockwave(vol);
     } else if (fx.kind === 'strike') {
-      const c = S.cars[fx.target];
+      const c = Number.isInteger(fx.target) ? S.cars[fx.target] : null;
       if (!c) return;
       const v = c.vehicle;
       S.pickVis.lightning(new THREE.Vector3(v.x + 6, v.y + 70, v.z - 4), new THREE.Vector3(v.x, v.y + 0.8, v.z));

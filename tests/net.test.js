@@ -53,7 +53,7 @@ test('car states pack and unpack', () => {
 test('room codes use only unambiguous characters', () => {
   for (let i = 0; i < 200; i++) {
     const c = makeCode(rnd);
-    assert.equal(c.length, 4);
+    assert.equal(c.length, 6);
     for (const ch of c) assert.ok(CODE_CHARS.includes(ch));
   }
 });
@@ -196,4 +196,31 @@ test('with more players, each pair of cars is judged on its own', () => {
   // a cooldown on one pair doesn't block another
   assert.ok(j.add(claim('p1', 10.2, 'p1', 'takedown', 'p3'), 10.25, 0.1) === null);
   assert.equal(j.update(11, () => true).length, 1);
+});
+
+test('car states with impossible values are dropped, and broken buffers refused', () => {
+  const st = Object.fromEntries(STATE_FIELDS.map((k) => [k, 1]));
+  Object.assign(st, { idx: 3, scIdx: -1, flags: 0 });
+  const good = unpackStates(packStates(5, [st, { ...st, idx: 4, x: NaN }, { ...st, idx: 5, vx: 1e9 }]));
+  assert.deepEqual(good.states.map((s) => s.idx), [3]);
+  const buf = packStates(5, [st]);
+  assert.equal(unpackStates(buf.slice(0, buf.byteLength - 4)), null); // cut short
+  assert.equal(unpackStates(new ArrayBuffer(4)), null);
+  const bad = new DataView(packStates(5, [st]));
+  bad.setFloat64(0, Infinity, true);
+  assert.equal(unpackStates(bad.buffer), null);
+});
+
+test('text and labels from other players are made safe for the screen', async () => {
+  const { label, text, results, num, playerId } = await import('../game/src/net/guard.js');
+  assert.equal(label('<img src=x onerror=alert(1)>'), 'TAKEDOWN!');
+  assert.equal(label('TRAIN WRECK'), 'TRAIN WRECK');
+  assert.equal(text('<b>"HI"</b>'), 'bHI/b');
+  const r = results([{ name: '<script>x</script>', time: NaN, pos: 1, nested: { a: 1 } }]);
+  assert.equal(r[0].name, 'scriptx/script');
+  assert.equal(r[0].time, 0);
+  assert.equal(r[0].nested, undefined);
+  assert.equal(num(Infinity, 0, 5, 2), 2);
+  assert.equal(playerId('p3'), 'p3');
+  assert.equal(playerId('__proto__'), null);
 });
