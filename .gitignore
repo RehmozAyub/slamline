@@ -10,3 +10,9 @@ android/local.properties
 android/.gradle/
 android/build/
 android/app/build/
+# the exe's official-build key (tools/build.mjs writes it into the build folder only)
+game/official.json
+
+# the stats server's local test secrets and local database (wrangler dev)
+server/.dev.vars
+server/.wrangler/

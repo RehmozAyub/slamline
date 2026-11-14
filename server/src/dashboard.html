@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SLAMLINE Stats</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@1,700;1,800&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #120d14; --panel: #1c1520; --line: #31263a; --fg: #f3ecf2; --muted: #a99bab;
+  --hot: #ff3d5a; --warm: #ff8a1f; --gold: #ffcf3a; --ok: #4fd18b; --map0: #2a2030;
+  --display: "Barlow Condensed", "Bahnschrift", "Arial Narrow", sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left)) 60px; }
+h1, h2 { font-family: var(--display); font-style: italic; font-weight: 800; margin: 0; letter-spacing: 0.02em; }
+h1 { font-size: 40px; line-height: 1; }
+h1 b { background: linear-gradient(90deg, var(--hot), var(--warm)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h2 { font-size: 22px; text-transform: uppercase; margin-bottom: 10px; }
+.top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; justify-content: space-between; }
+.muted { color: var(--muted); }
+select, input, button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+button { cursor: pointer; }
+button.primary { background: linear-gradient(90deg, var(--hot), var(--warm)); color: #1a0e12; border: 0; font-weight: 600; }
+button.small { padding: 2px 8px; font-size: 12px; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 20px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.tile .n { font-family: var(--display); font-style: italic; font-weight: 800; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.wide { grid-column: 1 / -1; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+td.num, th.num { text-align: right; }
+.bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--hot), var(--warm)); }
+svg text { fill: var(--muted); font: 11px var(--body); }
+.fb { display: flex; flex-direction: column; gap: 8px; }
+.fb .msg { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.fb .msg.done { opacity: 0.55; }
+.fb .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; align-items: center; }
+.fb .text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; }
+.kind { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.08em; }
+.kind.bug { color: var(--hot); } .kind.idea { color: var(--gold); } .kind.other { color: var(--muted); }
+.spacer { flex: 1; }
+#login { max-width: 420px; margin: 18vh auto 0; display: flex; flex-direction: column; gap: 10px; }
+#err { color: var(--hot); min-height: 1.5em; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips button[aria-pressed="true"] { border-color: var(--warm); color: var(--warm); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <form id="login" hidden>
+    <h1>SLAMLINE <b>STATS</b></h1>
+    <label for="key" class="muted">Dashboard key</label>
+    <input id="key" type="password" autocomplete="current-password" required>
+    <label class="muted"><input id="remember" type="checkbox"> Remember on this device</label>
+    <button class="primary" type="submit">Open</button>
+    <div id="err"></div>
+  </form>
+
+  <div id="app" hidden>
+    <div class="top">
+      <div><h1>SLAMLINE <b>STATS</b></h1><div class="muted" id="since"></div></div>
+      <div class="chips" id="range"></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid">
+      <div class="card wide"><h2>Every day</h2><div class="scroll"><svg id="days" height="190"></svg></div><div class="muted" style="font-size:12px">Bars: sessions. Line: hours played. Click a bar to wipe that day's numbers (for a burst of fake data).</div></div>
+      <div class="card wide"><h2>Countries</h2><svg id="map" viewBox="0 0 960 470" style="width:100%;height:auto"></svg><div class="scroll"><table id="countries"></table></div></div>
+      <div class="card"><h2>Platforms</h2><table id="platforms"></table></div>
+      <div class="card"><h2>Versions</h2><table id="versions"></table></div>
+      <div class="card wide"><h2>Races</h2><div class="scroll"><table id="races"></table></div></div>
+      <div class="card"><h2>Online</h2><table id="online"></table></div>
+      <div class="card"><h2>Performance</h2><table id="perf"></table></div>
+      <div class="card wide"><h2>Errors</h2><div class="scroll"><table id="errors"></table></div></div>
+      <div class="card wide">
+        <div class="top"><h2>Feedback</h2><div class="chips" id="fbfilter"></div></div>
+        <div class="fb" id="feedback"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+const A2NUM = {"BG":100,"MM":104,"BI":108,"BY":112,"KH":116,"CM":120,"CA":124,"CV":132,"KY":136,"CF":140,"LK":144,"TD":148,"CL":152,"CN":156,"TW":158,"CX":162,"CC":166,"CO":170,"KM":174,"YT":175,"CG":178,"CD":180,"CK":184,"CR":188,"HR":191,"CU":192,"CY":196,"CZ":203,"BJ":204,"DK":208,"DM":212,"DO":214,"EC":218,"SV":222,"GQ":226,"ET":231,"ER":232,"EE":233,"FO":234,"FK":238,"GS":239,"FJ":242,"FI":246,"AX":248,"FR":250,"GF":254,"PF":258,"TF":260,"DJ":262,"GA":266,"GE":268,"GM":270,"PS":275,"DE":276,"GH":288,"GI":292,"KI":296,"GR":300,"GL":304,"GD":308,"GP":312,"GU":316,"GT":320,"GN":324,"GY":328,"HT":332,"HM":334,"VA":336,"HN":340,"HK":344,"HU":348,"IS":352,"IN":356,"ID":360,"IR":364,"IQ":368,"IE":372,"IL":376,"IT":380,"CI":384,"JM":388,"JP":392,"KZ":398,"JO":400,"KE":404,"KP":408,"KR":410,"KW":414,"KG":417,"LA":418,"LB":422,"LS":426,"LV":428,"LR":430,"LY":434,"LI":438,"LT":440,"LU":442,"MO":446,"MG":450,"MW":454,"MY":458,"MV":462,"ML":466,"MT":470,"MQ":474,"MR":478,"MU":480,"MX":484,"MC":492,"MN":496,"MD":498,"ME":499,"MS":500,"MA":504,"MZ":508,"OM":512,"NA":516,"NR":520,"NP":524,"NL":528,"CW":531,"AW":533,"SX":534,"BQ":535,"NC":540,"VU":548,"NZ":554,"NI":558,"NE":562,"NG":566,"NU":570,"NF":574,"NO":578,"MP":580,"UM":581,"FM":583,"MH":584,"PW":585,"PK":586,"PA":591,"PG":598,"PY":600,"PE":604,"PH":608,"PN":612,"PL":616,"PT":620,"GW":624,"TL":626,"PR":630,"QA":634,"RE":638,"RO":642,"RU":643,"RW":646,"BL":652,"SH":654,"KN":659,"AI":660,"LC":662,"MF":663,"PM":666,"VC":670,"SM":674,"ST":678,"SA":682,"SN":686,"RS":688,"SC":690,"SL":694,"SG":702,"SK":703,"VN":704,"SI":705,"SO":706,"ZA":710,"ZW":716,"ES":724,"SS":728,"SD":729,"EH":732,"SR":740,"SJ":744,"SZ":748,"SE":752,"CH":756,"SY":760,"TJ":762,"TH":764,"TG":768,"TK":772,"TO":776,"TT":780,"AE":784,"TN":788,"TR":792,"TM":795,"TC":796,"TV":798,"UG":800,"UA":804,"MK":807,"EG":818,"GB":826,"GG":831,"JE":832,"IM":833,"TZ":834,"US":840,"VI":850,"BF":854,"UY":858,"UZ":860,"VE":862,"WF":876,"WS":882,"YE":887,"ZM":894,"XK":983,"AF":4,"AL":8,"DZ":12,"AS":16,"AD":20,"AO":24,"AQ":10,"AG":28,"AR":32,"AM":51,"AU":36,"AT":40,"AZ":31,"BS":44,"BH":48,"BD":50,"BB":52,"BE":56,"BZ":84,"BM":60,"BT":64,"BO":68,"BA":70,"BW":72,"BV":74,"BR":76,"IO":86,"BN":96,"SB":90,"VG":92};
+const TRACK_NAMES = { coast: 'Sunset Coast', city: 'Neon City', alpine: 'Alpine Pass', snow: 'Whiteout Summit', canyon: 'Scorched Canyon', jungle: 'Monsoon Jungle', canal: 'Canal Quarter', space: 'Nebula Ring', airport: 'Skyport', volcano: 'Magma Core' };
+const PLATFORM_NAMES = { 'web-desktop': 'Browser, desktop', 'web-phone': 'Browser, phone or tablet', exe: 'Windows exe' };
+const regionName = (() => { try { const d = new Intl.DisplayNames(['en'], { type: 'region' }); return (c) => (c === 'XX' ? 'Unknown' : d.of(c) || c); } catch { return (c) => c; } })();
+const $ = (s) => document.querySelector(s);
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); } for (const c of kids) e.append(c instanceof Node ? c : String(c)); return e; };
+const fmt = (n) => Math.round(n || 0).toLocaleString('en');
+const hours = (s) => ((s || 0) / 3600).toLocaleString('en', { maximumFractionDigits: (s || 0) < 36000 ? 1 : 0 });
+
+let key = '', days = 30, data = null, fbFilter = 'new';
+try { key = sessionStorage.getItem('slk') || localStorage.getItem('slk') || ''; } catch {}
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' } });
+  if (r.status === 401) throw new Error('key');
+  if (!r.ok) throw new Error('http ' + r.status);
+  return r.json();
+}
+
+async function load() {
+  try { data = await api('/v1/stats?days=' + days); }
+  catch (e) { if (e.message === 'key') { showLogin('That key is wrong.'); return; } $('#since').textContent = 'Couldn\'t load the numbers. Try again in a moment.'; return; }
+  $('#login').hidden = true; $('#app').hidden = false;
+  render();
+}
+
+function showLogin(msg = '') { $('#app').hidden = true; $('#login').hidden = false; $('#err').textContent = msg; $('#key').focus(); }
+
+$('#login').addEventListener('submit', (e) => {
+  e.preventDefault();
+  key = $('#key').value.trim();
+  try { sessionStorage.setItem('slk', key); if ($('#remember').checked) localStorage.setItem('slk', key); else localStorage.removeItem('slk'); } catch {}
+  load();
+});
+
+function table(id, head, rows) {
+  const t = $(id); t.textContent = '';
+  t.append(el('tr', {}, ...head.map(([h, n]) => el('th', n ? { class: 'num' } : {}, h))));
+  if (!rows.length) { t.append(el('tr', {}, el('td', { colspan: head.length, class: 'muted' }, 'Nothing yet'))); return; }
+  for (const r of rows) t.append(el('tr', {}, ...r.map((c, i) => el('td', head[i][1] ? { class: 'num' } : {}, c))));
+}
+const barCell = (v, max) => { const w = el('div', { class: 'bar' }); w.style.width = Math.max(2, (v / (max || 1)) * 120) + 'px'; return w; };
+
+function render() {
+  const d = data, all = d.allTime || {};
+  $('#since').textContent = all.first ? `Counting since ${all.first}. All time: ${fmt(all.s)} sessions, ${hours(all.a)} hours played.` : 'No plays counted yet.';
+  const range = $('#range'); range.textContent = '';
+  for (const n of [7, 30, 90, 365]) range.append(el('button', { 'aria-pressed': String(n === days), onclick: () => { days = n; load(); } }, n === 365 ? '1 year' : n + ' days'));
+
+  const sum = (k) => d.byDay.reduce((a, r) => a + (r[k] || 0), 0);
+  const races = d.races.reduce((a, r) => ({ st: a.st + r.st, fi: a.fi + r.fi }), { st: 0, fi: 0 });
+  const tiles = [[fmt(sum('s')), 'Sessions'], [hours(sum('a')), 'Hours played'], [hours(sum('o')), 'Hours open'], [fmt(d.byCountry.filter((c) => c.country !== 'XX').length), 'Countries'], [fmt(races.fi), 'Races finished'], [fmt(d.feedback.filter((f) => f.status === 'new').length), 'New feedback']];
+  $('#tiles').textContent = '';
+  for (const [n, l] of tiles) $('#tiles').append(el('div', { class: 'tile' }, el('div', { class: 'n' }, n), el('div', { class: 'l' }, l)));
+
+  drawDays(); drawMap();
+  const maxC = Math.max(1, ...d.byCountry.map((c) => c.s));
+  table('#countries', [['Country'], ['Sessions', 1], ['Hours played', 1], ['']], d.byCountry.map((c) => [regionName(c.country), fmt(c.s), hours(c.a), barCell(c.s, maxC)]));
+  const maxP = Math.max(1, ...d.byPlatform.map((c) => c.s));
+  table('#platforms', [['Platform'], ['Sessions', 1], ['Hours', 1], ['']], d.byPlatform.map((p) => [PLATFORM_NAMES[p.platform] || p.platform, fmt(p.s), hours(p.a), barCell(p.s, maxP)]));
+  table('#versions', [['Version'], ['Sessions', 1], ['Hours', 1]], d.byVersion.map((v) => ['v' + v.version, fmt(v.s), hours(v.a)]));
+
+  const byTrack = {};
+  for (const r of d.races) {
+    const t = byTrack[r.track] || (byTrack[r.track] = { st: 0, fi: 0, qu: 0, solo: 0, split: 0, online: 0, mir: 0 });
+    t.st += r.st; t.fi += r.fi; t.qu += r.qu; t[r.mode] += r.st; if (r.mirrored) t.mir += r.st;
+  }
+  const tr = Object.entries(byTrack).sort((a, b) => b[1].st - a[1].st);
+  table('#races', [['Track'], ['Started', 1], ['Finished', 1], ['Quit', 1], ['Solo', 1], ['Split screen', 1], ['Online', 1], ['Mirrored', 1]],
+    tr.map(([k, t]) => [TRACK_NAMES[k] || k, fmt(t.st), fmt(t.fi), fmt(t.qu), fmt(t.solo), fmt(t.split), fmt(t.online), fmt(t.mir)]));
+
+  const rh = sum('rh'), rp = sum('rp'), cf = sum('cf');
+  table('#online', [['', 0], ['', 1]], [['Rooms hosted', fmt(rh)], ['Players per room (average)', rh ? (rp / rh).toFixed(1) : '-'], ['Failed connections', fmt(cf)]]);
+  table('#perf', [['Platform'], ['Graphics'], ['Avg FPS', 1], ['Samples', 1]], d.perf.sort((a, b) => b.n - a.n).map((p) => [PLATFORM_NAMES[p.platform] || p.platform, p.quality.toUpperCase(), (p.f / p.n).toFixed(0), fmt(p.n)]));
+  table('#errors', [['Error'], ['Message'], ['Count', 1], ['Last seen']], d.errors.map((e) => [e.kind, e.message, fmt(e.n), e.last]));
+  renderFeedback();
+}
+
+function drawDays() {
+  const svg = d3.select('#days'), rows = data.byDay;
+  svg.selectAll('*').remove();
+  const W = Math.max(600, $('#days').parentNode.clientWidth), H = 190, m = { l: 40, r: 44, t: 10, b: 24 };
+  svg.attr('width', W);
+  if (!rows.length) { svg.append('text').attr('x', m.l).attr('y', 40).text('No days yet'); return; }
+  const x = d3.scaleBand().domain(rows.map((r) => r.day)).range([m.l, W - m.r]).padding(0.2);
+  const ys = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.s) || 1]).nice().range([H - m.b, m.t]);
+  const yh = d3.scaleLinear().domain([0, (d3.max(rows, (r) => r.a) || 1) / 3600]).nice().range([H - m.b, m.t]);
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(ys).ticks(4)).call((g) => g.select('.domain').remove()).selectAll('line').attr('stroke', 'var(--line)');
+  svg.append('g').attr('transform', `translate(${W - m.r},0)`).call(d3.axisRight(yh).ticks(4)).call((g) => g.select('.domain').remove()).selectAll('line').attr('stroke', 'var(--line)');
+  const every = Math.ceil(rows.length / 10);
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(rows.map((r) => r.day).filter((_, i) => i % every === 0)).tickFormat((s) => s.slice(5))).call((g) => g.select('.domain').attr('stroke', 'var(--line)')).selectAll('line').attr('stroke', 'var(--line)');
+  svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', (r) => x(r.day)).attr('width', x.bandwidth()).attr('y', (r) => ys(r.s)).attr('height', (r) => H - m.b - ys(r.s)).attr('fill', 'var(--hot)').attr('rx', 2).style('cursor', 'pointer')
+    .on('click', (_, r) => wipeDay(r.day)).append('title').text((r) => `${r.day}: ${fmt(r.s)} sessions, ${hours(r.a)} h played`);
+  svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', 'var(--gold)').attr('stroke-width', 2).attr('d', d3.line().x((r) => x(r.day) + x.bandwidth() / 2).y((r) => yh(r.a / 3600)));
+}
+
+async function wipeDay(day) {
+  const ok = await ask(`Wipe all play numbers for ${day}? This can't be undone. Feedback stays.`);
+  if (!ok) return;
+  await api('/v1/admin/day/' + day, { method: 'DELETE' }); load();
+}
+
+let world = null;
+async function drawMap() {
+  const svg = d3.select('#map');
+  if (!world) {
+    try { world = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json'); } catch { return; }
+  }
+  svg.selectAll('*').remove();
+  const byNum = new Map(data.byCountry.map((c) => [A2NUM[c.country], c]));
+  const max = Math.max(1, ...data.byCountry.map((c) => c.s));
+  const color = d3.scaleSequentialLog([1, max + 1], d3.interpolateRgb('#5a2235', '#ffb03a'));
+  const proj = d3.geoNaturalEarth1().fitSize([960, 470], { type: 'Sphere' });
+  const path = d3.geoPath(proj);
+  const countries = topojson.feature(world, world.objects.countries).features;
+  svg.append('path').attr('d', path({ type: 'Sphere' })).attr('fill', 'none').attr('stroke', 'var(--line)');
+  svg.append('g').selectAll('path').data(countries).join('path').attr('d', path)
+    .attr('fill', (f) => { const c = byNum.get(+f.id); return c ? color(c.s + 1) : 'var(--map0)'; })
+    .attr('stroke', 'var(--bg)').attr('stroke-width', 0.4)
+    .append('title').text((f) => { const c = byNum.get(+f.id); return `${f.properties.name}: ${c ? fmt(c.s) + ' sessions, ' + hours(c.a) + ' h' : 'no plays'}`; });
+}
+
+function renderFeedback() {
+  const f = $('#fbfilter'); f.textContent = '';
+  const counts = { new: 0, done: 0, all: data.feedback.length };
+  for (const m of data.feedback) counts[m.status]++;
+  for (const k of ['new', 'done', 'all']) f.append(el('button', { 'aria-pressed': String(k === fbFilter), onclick: () => { fbFilter = k; renderFeedback(); } }, `${k[0].toUpperCase() + k.slice(1)} (${counts[k]})`));
+  const box = $('#feedback'); box.textContent = '';
+  const list = data.feedback.filter((m) => fbFilter === 'all' || m.status === fbFilter);
+  if (!list.length) box.append(el('div', { class: 'muted' }, fbFilter === 'new' ? 'No new feedback.' : 'Nothing here.'));
+  for (const m of list) {
+    const meta = el('div', { class: 'meta' },
+      el('span', { class: 'kind ' + m.kind }, m.kind),
+      new Date(m.created).toLocaleString(), 'v' + m.version, PLATFORM_NAMES[m.platform] || m.platform,
+      m.track !== '-' ? (TRACK_NAMES[m.track] || m.track) : '', m.quality !== '-' ? m.quality.toUpperCase() : '', regionName(m.country),
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'small', onclick: async () => { await api('/v1/admin/feedback/' + m.id, { method: 'POST', body: JSON.stringify({ status: m.status === 'new' ? 'done' : 'new' }) }); m.status = m.status === 'new' ? 'done' : 'new'; renderFeedback(); } }, m.status === 'new' ? 'Mark done' : 'Mark new'),
+      el('button', { class: 'small', onclick: async () => { if (!(await ask('Delete this feedback for good?'))) return; await api('/v1/admin/feedback/' + m.id, { method: 'DELETE' }); data.feedback = data.feedback.filter((x) => x !== m); renderFeedback(); } }, 'Delete'));
+    box.append(el('div', { class: 'msg' + (m.status === 'done' ? ' done' : '') }, meta, el('div', { class: 'text' }, m.text)));
+  }
+}
+
+// an in-page yes/no (no browser dialogs)
+function ask(text) {
+  return new Promise((done) => {
+    const d = el('dialog', {}, el('p', {}, text));
+    d.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;max-width:420px';
+    const row = el('div', { class: 'chips' }, el('button', { class: 'primary', onclick: () => { d.close(); done(true); } }, 'Yes'), el('button', { onclick: () => { d.close(); done(false); } }, 'Cancel'));
+    d.append(row); document.body.append(d); d.showModal();
+    d.addEventListener('close', () => d.remove());
+  });
+}
+
+if (key) load(); else showLogin();
+</script>
+</body>
+</html>

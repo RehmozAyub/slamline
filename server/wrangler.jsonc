@@ -1,0 +1,19 @@
+// SLAMLINE's stats and feedback server (Cloudflare Workers + D1). Deploy: see server/README.md.
+// Secrets (never in this file): ADMIN_KEY (the dashboard key), BUILD_KEY (the exe's key).
+{
+  "name": "slamline-stats",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vars": { "PAGES_ORIGIN": "https://rehmozayub.github.io" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "slamline", "database_id": "0b3fc484-41bc-4bba-b5d1-59fcf6dd8dc2", "migrations_dir": "migrations" }
+  ],
+  // per connection: a beat every few minutes is normal; feedback a couple of times a minute at most
+  "ratelimits": [
+    { "name": "BEAT_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
+    { "name": "FEEDBACK_LIMIT", "namespace_id": "1002", "simple": { "limit": 2, "period": 60 } }
+  ],
+  "triggers": { "crons": ["17 3 * * *"] }
+}
