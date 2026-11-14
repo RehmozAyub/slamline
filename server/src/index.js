@@ -194,21 +194,27 @@ async function admin(req, env, url) {
   if (!env.ADMIN_KEY || !(await same(key, env.ADMIN_KEY))) return json(401, { error: 'wrong key' });
   const db = env.DB;
   if (url.pathname === '/v1/stats' && req.method === 'GET') {
-    const days = Math.round(num(+url.searchParams.get('days') || 30, 1, 3650));
-    const from = new Date(Date.now() - (days - 1) * 86400000).toISOString().slice(0, 10);
+    // the range: ?from=YYYY-MM-DD&to=YYYY-MM-DD, ?days=all (since the first day counted) or ?days=N
     const q = (sql, ...a) => db.prepare(sql).bind(...a).all().then((r) => r.results);
+    const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const to = isDay(url.searchParams.get('to')) ? url.searchParams.get('to') : today();
+    let from;
+    if (isDay(url.searchParams.get('from'))) from = url.searchParams.get('from');
+    else if (url.searchParams.get('days') === 'all') from = ((await q('SELECT MIN(day) d FROM daily'))[0] || {}).d || to;
+    else from = new Date(Date.now() - (Math.round(num(+url.searchParams.get('days') || 30, 1, 3650)) - 1) * 86400000).toISOString().slice(0, 10);
+    if (from > to) from = to;
     const [byDay, byCountry, byPlatform, byVersion, races, perf, errors, fb, all] = await Promise.all([
-      q('SELECT day, SUM(sessions) s, SUM(open_s) o, SUM(active_s) a, SUM(rooms_hosted) rh, SUM(room_players) rp, SUM(conn_failed) cf FROM daily WHERE day >= ? GROUP BY day ORDER BY day', from),
-      q('SELECT country, SUM(sessions) s, SUM(active_s) a FROM daily WHERE day >= ? GROUP BY country ORDER BY s DESC', from),
-      q('SELECT platform, SUM(sessions) s, SUM(active_s) a FROM daily WHERE day >= ? GROUP BY platform ORDER BY s DESC', from),
-      q('SELECT version, SUM(sessions) s, SUM(active_s) a FROM daily WHERE day >= ? GROUP BY version ORDER BY s DESC', from),
-      q('SELECT track, mode, mirrored, SUM(started) st, SUM(finished) fi, SUM(quit) qu FROM daily_races WHERE day >= ? GROUP BY track, mode, mirrored', from),
-      q('SELECT platform, quality, SUM(samples) n, SUM(fps_sum) f FROM daily_perf WHERE day >= ? GROUP BY platform, quality', from),
-      q('SELECT kind, message, SUM(count) n, MAX(day) last FROM daily_errors WHERE day >= ? GROUP BY kind, message ORDER BY n DESC LIMIT 40', from),
+      q('SELECT day, SUM(sessions) s, SUM(open_s) o, SUM(active_s) a, SUM(rooms_hosted) rh, SUM(room_players) rp, SUM(conn_failed) cf FROM daily WHERE day >= ? AND day <= ? GROUP BY day ORDER BY day', from, to),
+      q('SELECT country, SUM(sessions) s, SUM(active_s) a FROM daily WHERE day >= ? AND day <= ? GROUP BY country ORDER BY s DESC', from, to),
+      q('SELECT platform, SUM(sessions) s, SUM(active_s) a FROM daily WHERE day >= ? AND day <= ? GROUP BY platform ORDER BY s DESC', from, to),
+      q('SELECT version, SUM(sessions) s, SUM(active_s) a FROM daily WHERE day >= ? AND day <= ? GROUP BY version ORDER BY s DESC', from, to),
+      q('SELECT track, mode, mirrored, SUM(started) st, SUM(finished) fi, SUM(quit) qu FROM daily_races WHERE day >= ? AND day <= ? GROUP BY track, mode, mirrored', from, to),
+      q('SELECT platform, quality, SUM(samples) n, SUM(fps_sum) f FROM daily_perf WHERE day >= ? AND day <= ? GROUP BY platform, quality', from, to),
+      q('SELECT kind, message, SUM(count) n, MAX(day) last FROM daily_errors WHERE day >= ? AND day <= ? GROUP BY kind, message ORDER BY n DESC LIMIT 40', from, to),
       q('SELECT id, created, kind, text, version, platform, track, quality, country, status FROM feedback ORDER BY id DESC LIMIT 300'),
       q('SELECT SUM(sessions) s, SUM(open_s) o, SUM(active_s) a, MIN(day) first FROM daily'),
     ]);
-    return json(200, { days, from, byDay, byCountry, byPlatform, byVersion, races, perf, errors, feedback: fb, allTime: all[0] || {} });
+    return json(200, { from, to, byDay, byCountry, byPlatform, byVersion, races, perf, errors, feedback: fb, allTime: all[0] || {} });
   }
   let m = url.pathname.match(/^\/v1\/admin\/feedback\/(\d+)$/);
   if (m && req.method === 'POST') {

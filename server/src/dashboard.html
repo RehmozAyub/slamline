@@ -29,24 +29,33 @@ button { cursor: pointer; }
 button.primary { background: linear-gradient(90deg, var(--hot), var(--warm)); color: #1a0e12; border: 0; font-weight: 600; }
 button.small { padding: 2px 8px; font-size: 12px; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 20px; }
+.tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+@media (max-width: 980px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile .n { font-size: 28px; } }
 .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
 .tile .n { font-family: var(--display); font-style: italic; font-weight: 800; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .tile .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+@media (max-width: 720px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
 .wide { grid-column: 1 / -1; }
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td:first-child { white-space: normal; }
+.more { margin-top: 8px; }
+#loading { margin: 18vh auto 0; text-align: center; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
 td.num, th.num { text-align: right; }
 .bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--hot), var(--warm)); }
+td.barcell { width: 30%; min-width: 60px; }
+@media (max-width: 520px) { td.barcell, th:empty { display: none; } }
 svg text { fill: var(--muted); font: 11px var(--body); }
 .fb { display: flex; flex-direction: column; gap: 8px; }
 .fb .msg { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 .fb .msg.done { opacity: 0.55; }
-.fb .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; align-items: center; }
+.fb .meta { display: flex; flex-wrap: wrap; gap: 4px 6px; color: var(--muted); font-size: 12px; align-items: center; }
+.fb .meta .dot::before { content: "·"; margin-right: 6px; }
 .fb .text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; }
 .kind { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.08em; }
 .kind.bug { color: var(--hot); } .kind.idea { color: var(--gold); } .kind.other { color: var(--muted); }
@@ -55,6 +64,14 @@ svg text { fill: var(--muted); font: 11px var(--body); }
 #err { color: var(--hot); min-height: 1.5em; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chips button[aria-pressed="true"] { border-color: var(--warm); color: var(--warm); }
+.custom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.custom input { color-scheme: dark; }
+button.destructive { background: transparent; color: var(--hot); border-color: var(--hot); }
+button.destructive:disabled { opacity: 0.4; cursor: default; }
+.card.danger { border-color: color-mix(in srgb, var(--hot) 35%, var(--line)); }
+.card.danger p { margin: 0 0 10px; max-width: 70ch; }
+.wipe { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.wipe input { color-scheme: dark; }
 </style>
 </head>
 <body>
@@ -68,21 +85,39 @@ svg text { fill: var(--muted); font: 11px var(--body); }
     <div id="err"></div>
   </form>
 
+  <p id="loading" class="muted">Loading the numbers…</p>
   <div id="app" hidden>
     <div class="top">
       <div><h1>SLAMLINE <b>STATS</b></h1><div class="muted" id="since"></div></div>
-      <div class="chips" id="range"></div>
+      <div>
+        <div class="chips" id="range"></div>
+        <form class="custom" id="custom" hidden>
+          <label class="muted" for="from">From</label><input id="from" type="date" required>
+          <label class="muted" for="to">to</label><input id="to" type="date" required>
+          <button class="primary" type="submit">Show</button>
+        </form>
+      </div>
     </div>
     <div class="tiles" id="tiles"></div>
     <div class="grid">
-      <div class="card wide"><h2>Every day</h2><div class="scroll"><svg id="days" height="190"></svg></div><div class="muted" style="font-size:12px">Bars: sessions. Line: hours played. Click a bar to wipe that day's numbers (for a burst of fake data).</div></div>
-      <div class="card wide"><h2>Countries</h2><svg id="map" viewBox="0 0 960 470" style="width:100%;height:auto"></svg><div class="scroll"><table id="countries"></table></div></div>
-      <div class="card"><h2>Platforms</h2><table id="platforms"></table></div>
-      <div class="card"><h2>Versions</h2><table id="versions"></table></div>
+      <div class="card wide"><h2 id="days-title">Every day</h2><div class="scroll"><svg id="days" height="190"></svg></div><div class="muted" style="font-size:12px">Bars: sessions. Line: hours played. Hover a bar for its numbers.</div></div>
+      <div class="card wide"><h2>Countries</h2><svg id="map" viewBox="0 0 960 470" style="width:100%;height:auto"></svg><div class="scroll"><table id="countries"></table></div><button class="small more" id="more-countries" hidden></button></div>
+      <div class="card"><h2>Platforms</h2><div class="scroll"><table id="platforms"></table></div></div>
+      <div class="card"><h2>Versions</h2><div class="scroll"><table id="versions"></table></div></div>
       <div class="card wide"><h2>Races</h2><div class="scroll"><table id="races"></table></div></div>
-      <div class="card"><h2>Online</h2><table id="online"></table></div>
-      <div class="card"><h2>Performance</h2><table id="perf"></table></div>
+      <div class="card"><h2>Online</h2><div class="scroll"><table id="online"></table></div></div>
+      <div class="card"><h2>Performance</h2><div class="scroll"><table id="perf"></table></div></div>
       <div class="card wide"><h2>Errors</h2><div class="scroll"><table id="errors"></table></div></div>
+      <div class="card wide danger">
+        <h2>Remove fake data</h2>
+        <p class="muted">If a day's numbers were faked (a sudden spike from one country, say), you can remove that whole day's play numbers. Feedback isn't touched. This can't be undone.</p>
+        <form id="wipe" class="wipe">
+          <label class="muted" for="wipe-day">Day</label><input id="wipe-day" type="date" required>
+          <label class="muted" for="wipe-confirm" id="wipe-label">Pick a day first</label><input id="wipe-confirm" type="text" autocomplete="off" required disabled>
+          <button class="destructive" type="submit" id="wipe-go" disabled>Remove this day</button>
+          <span id="wipe-msg" class="muted"></span>
+        </form>
+      </div>
       <div class="card wide">
         <div class="top"><h2>Feedback</h2><div class="chips" id="fbfilter"></div></div>
         <div class="fb" id="feedback"></div>
@@ -103,7 +138,9 @@ const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag)
 const fmt = (n) => Math.round(n || 0).toLocaleString('en');
 const hours = (s) => ((s || 0) / 3600).toLocaleString('en', { maximumFractionDigits: (s || 0) < 36000 ? 1 : 0 });
 
-let key = '', days = 30, data = null, fbFilter = 'new';
+// range: { days: N } | { all: true } | { from, to } (YYYY-MM-DD)
+let key = '', range = { days: 30 }, data = null, fbFilter = 'new';
+const rangeQuery = () => (range.all ? 'days=all' : range.from ? `from=${range.from}&to=${range.to}` : `days=${range.days}`);
 try { key = sessionStorage.getItem('slk') || localStorage.getItem('slk') || ''; } catch {}
 
 async function api(path, opts = {}) {
@@ -114,13 +151,13 @@ async function api(path, opts = {}) {
 }
 
 async function load() {
-  try { data = await api('/v1/stats?days=' + days); }
-  catch (e) { if (e.message === 'key') { showLogin('That key is wrong.'); return; } $('#since').textContent = 'Couldn\'t load the numbers. Try again in a moment.'; return; }
-  $('#login').hidden = true; $('#app').hidden = false;
+  try { data = await api('/v1/stats?' + rangeQuery()); }
+  catch (e) { if (e.message === 'key') { showLogin('That key is wrong.'); return; } $('#since').textContent = 'Couldn\'t load the numbers. Try again in a moment.'; $('#loading').textContent = 'Couldn\'t load the numbers. Reload the page in a moment.'; return; }
+  $('#login').hidden = true; $('#loading').hidden = true; $('#app').hidden = false;
   render();
 }
 
-function showLogin(msg = '') { $('#app').hidden = true; $('#login').hidden = false; $('#err').textContent = msg; $('#key').focus(); }
+function showLogin(msg = '') { $('#app').hidden = true; $('#loading').hidden = true; $('#login').hidden = false; $('#err').textContent = msg; $('#key').focus(); }
 
 $('#login').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -131,17 +168,41 @@ $('#login').addEventListener('submit', (e) => {
 
 function table(id, head, rows) {
   const t = $(id); t.textContent = '';
-  t.append(el('tr', {}, ...head.map(([h, n]) => el('th', n ? { class: 'num' } : {}, h))));
+  if (head.some(([h]) => h)) t.append(el('tr', {}, ...head.map(([h, n]) => el('th', n ? { class: 'num' } : {}, h))));
   if (!rows.length) { t.append(el('tr', {}, el('td', { colspan: head.length, class: 'muted' }, 'Nothing yet'))); return; }
-  for (const r of rows) t.append(el('tr', {}, ...r.map((c, i) => el('td', head[i][1] ? { class: 'num' } : {}, c))));
+  for (const r of rows) t.append(el('tr', {}, ...r.map((c, i) => el('td', head[i][1] ? { class: 'num' } : c instanceof Node && c.className === 'bar' ? { class: 'barcell' } : {}, c))));
 }
-const barCell = (v, max) => { const w = el('div', { class: 'bar' }); w.style.width = Math.max(2, (v / (max || 1)) * 120) + 'px'; return w; };
+// a bar sized as a share of its cell (the last column), so it never runs out of a narrow card
+const barCell = (v, max) => { const w = el('div', { class: 'bar' }); w.style.width = Math.max(2, (v / (max || 1)) * 100) + '%'; return w; };
+
+function renderRange() {
+  const box = $('#range'); box.textContent = '';
+  const pick = (r) => () => { range = r; $('#custom').hidden = true; load(); };
+  const open = !$('#custom').hidden; // while picking custom dates, only Custom is lit
+  for (const n of [7, 30, 90, 365]) box.append(el('button', { 'aria-pressed': String(!open && range.days === n), onclick: pick({ days: n }) }, n === 365 ? '1 year' : n + ' days'));
+  box.append(el('button', { 'aria-pressed': String(!open && !!range.all), onclick: pick({ all: true }) }, 'All time'));
+  box.append(el('button', { 'aria-pressed': String(open || !!range.from), onclick: () => {
+    const f = $('#custom');
+    f.hidden = !f.hidden;
+    if (!f.hidden) { $('#from').value = range.from || data.from; $('#to').value = range.to || data.to; $('#from').focus(); }
+    renderRange();
+  } }, range.from ? `${range.from} to ${range.to}` : 'Custom'));
+}
+
+$('#custom').addEventListener('submit', (e) => {
+  e.preventDefault();
+  let a = $('#from').value, b = $('#to').value;
+  if (!a || !b) return;
+  if (a > b) [a, b] = [b, a];
+  range = { from: a, to: b };
+  $('#custom').hidden = true;
+  load();
+});
 
 function render() {
   const d = data, all = d.allTime || {};
-  $('#since').textContent = all.first ? `Counting since ${all.first}. All time: ${fmt(all.s)} sessions, ${hours(all.a)} hours played.` : 'No plays counted yet.';
-  const range = $('#range'); range.textContent = '';
-  for (const n of [7, 30, 90, 365]) range.append(el('button', { 'aria-pressed': String(n === days), onclick: () => { days = n; load(); } }, n === 365 ? '1 year' : n + ' days'));
+  $('#since').textContent = all.first ? `Showing ${d.from} to ${d.to}. Counting since ${all.first}: ${fmt(all.s)} sessions, ${hours(all.a)} hours played in all.` : 'No plays counted yet.';
+  renderRange();
 
   const sum = (k) => d.byDay.reduce((a, r) => a + (r[k] || 0), 0);
   const races = d.races.reduce((a, r) => ({ st: a.st + r.st, fi: a.fi + r.fi }), { st: 0, fi: 0 });
@@ -151,7 +212,12 @@ function render() {
 
   drawDays(); drawMap();
   const maxC = Math.max(1, ...d.byCountry.map((c) => c.s));
-  table('#countries', [['Country'], ['Sessions', 1], ['Hours played', 1], ['']], d.byCountry.map((c) => [regionName(c.country), fmt(c.s), hours(c.a), barCell(c.s, maxC)]));
+  const showAll = !!render.allCountries, list = showAll ? d.byCountry : d.byCountry.slice(0, 15);
+  table('#countries', [['Country'], ['Sessions', 1], ['Hours played', 1], ['']], list.map((c) => [regionName(c.country), fmt(c.s), hours(c.a), barCell(c.s, maxC)]));
+  const more = $('#more-countries');
+  more.hidden = d.byCountry.length <= 15;
+  more.textContent = showAll ? 'Show the top 15' : `Show all ${d.byCountry.length} countries`;
+  more.onclick = () => { render.allCountries = !showAll; render(); };
   const maxP = Math.max(1, ...d.byPlatform.map((c) => c.s));
   table('#platforms', [['Platform'], ['Sessions', 1], ['Hours', 1], ['']], d.byPlatform.map((p) => [PLATFORM_NAMES[p.platform] || p.platform, fmt(p.s), hours(p.a), barCell(p.s, maxP)]));
   table('#versions', [['Version'], ['Sessions', 1], ['Hours', 1]], d.byVersion.map((v) => ['v' + v.version, fmt(v.s), hours(v.a)]));
@@ -173,28 +239,68 @@ function render() {
 }
 
 function drawDays() {
-  const svg = d3.select('#days'), rows = data.byDay;
+  const svg = d3.select('#days');
   svg.selectAll('*').remove();
-  const W = Math.max(600, $('#days').parentNode.clientWidth), H = 190, m = { l: 40, r: 44, t: 10, b: 24 };
+  const W = Math.max(300, $('#days').parentNode.clientWidth), H = 190, m = { l: 40, r: 48, t: 10, b: 24 };
   svg.attr('width', W);
+  // every day of the chosen range, with zeros for days nobody played
+  const have = new Map(data.byDay.map((r) => [r.day, r]));
+  const rows = [];
+  for (let t = Date.parse(data.from + 'T00:00:00Z'), end = Date.parse(data.to + 'T00:00:00Z'); t <= end; t += 86400000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    rows.push(have.get(day) || { day, s: 0, a: 0 });
+  }
   if (!rows.length) { svg.append('text').attr('x', m.l).attr('y', 40).text('No days yet'); return; }
+  // long ranges in weeks (from 3 months) or months (from 13 months), so bars stay readable
+  const unit = rows.length > 400 ? 'month' : rows.length > 92 ? 'week' : 'day';
+  $('#days-title').textContent = { day: 'Every day', week: 'Every week', month: 'Every month' }[unit];
+  if (unit !== 'day') {
+    const groups = new Map();
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i], key = unit === 'month' ? r.day.slice(0, 7) + '-01' : rows[Math.floor(i / 7) * 7].day;
+      const g = groups.get(key) || { day: key, s: 0, a: 0, last: r.day };
+      g.s += r.s; g.a += r.a; g.last = r.day;
+      groups.set(key, g);
+    }
+    rows.length = 0;
+    rows.push(...groups.values());
+  }
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const label = (d) => (unit === 'month' ? `${MONTHS[+d.slice(5, 7) - 1]} ${d.slice(2, 4)}` : d.slice(5));
+  const tipDate = (r) => (unit === 'day' ? r.day : unit === 'month' ? label(r.day) : `${r.day} to ${r.last}`);
   const x = d3.scaleBand().domain(rows.map((r) => r.day)).range([m.l, W - m.r]).padding(0.2);
-  const ys = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.s) || 1]).nice().range([H - m.b, m.t]);
-  const yh = d3.scaleLinear().domain([0, (d3.max(rows, (r) => r.a) || 1) / 3600]).nice().range([H - m.b, m.t]);
-  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(ys).ticks(4)).call((g) => g.select('.domain').remove()).selectAll('line').attr('stroke', 'var(--line)');
-  svg.append('g').attr('transform', `translate(${W - m.r},0)`).call(d3.axisRight(yh).ticks(4)).call((g) => g.select('.domain').remove()).selectAll('line').attr('stroke', 'var(--line)');
-  const every = Math.ceil(rows.length / 10);
-  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(rows.map((r) => r.day).filter((_, i) => i % every === 0)).tickFormat((s) => s.slice(5))).call((g) => g.select('.domain').attr('stroke', 'var(--line)')).selectAll('line').attr('stroke', 'var(--line)');
-  svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', (r) => x(r.day)).attr('width', x.bandwidth()).attr('y', (r) => ys(r.s)).attr('height', (r) => H - m.b - ys(r.s)).attr('fill', 'var(--hot)').attr('rx', 2).style('cursor', 'pointer')
-    .on('click', (_, r) => wipeDay(r.day)).append('title').text((r) => `${r.day}: ${fmt(r.s)} sessions, ${hours(r.a)} h played`);
+  const bw = Math.min(x.bandwidth(), 28), off = (x.bandwidth() - bw) / 2;
+  // whole sessions on the left, hours on the right (at least 0-4 and 0-1 so a quiet start isn't all fractions)
+  const ys = d3.scaleLinear().domain([0, Math.max(4, d3.max(rows, (r) => r.s))]).nice().range([H - m.b, m.t]);
+  const yh = d3.scaleLinear().domain([0, Math.max(1, d3.max(rows, (r) => r.a) / 3600)]).nice().range([H - m.b, m.t]);
+  const axis = (g) => { g.select('.domain').remove(); g.selectAll('line').attr('stroke', 'var(--line)'); };
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(ys).ticks(4).tickFormat(d3.format('d'))).call(axis);
+  svg.append('g').attr('transform', `translate(${W - m.r},0)`).call(d3.axisRight(yh).ticks(4).tickFormat((v) => `${v}h`)).call(axis);
+  const every = Math.ceil(rows.length / Math.max(2, Math.floor((W - m.l - m.r) / 56))); // a label every ~56 px
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(rows.map((r) => r.day).filter((_, i) => i % every === 0)).tickFormat(label)).call((g) => g.select('.domain').attr('stroke', 'var(--line)')).selectAll('line').attr('stroke', 'var(--line)');
+  svg.append('g').selectAll('rect').data(rows.filter((r) => r.s > 0)).join('rect').attr('x', (r) => x(r.day) + off).attr('width', bw).attr('y', (r) => ys(r.s)).attr('height', (r) => H - m.b - ys(r.s)).attr('fill', 'var(--hot)').attr('rx', 2)
+    .append('title').text((r) => `${tipDate(r)}: ${fmt(r.s)} sessions, ${hours(r.a)} h played`);
   svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', 'var(--gold)').attr('stroke-width', 2).attr('d', d3.line().x((r) => x(r.day) + x.bandwidth() / 2).y((r) => yh(r.a / 3600)));
 }
 
-async function wipeDay(day) {
-  const ok = await ask(`Wipe all play numbers for ${day}? This can't be undone. Feedback stays.`);
-  if (!ok) return;
-  await api('/v1/admin/day/' + day, { method: 'DELETE' }); load();
-}
+// removing a day: pick it, type it again, then the button unlocks
+const wipeReady = () => {
+  const d = $('#wipe-day').value;
+  $('#wipe-label').textContent = d ? `Type ${d} to confirm` : 'Pick a day first';
+  $('#wipe-confirm').disabled = !d;
+  $('#wipe-confirm').placeholder = d || '';
+  $('#wipe-go').disabled = !d || $('#wipe-confirm').value.trim() !== d;
+};
+$('#wipe-day').addEventListener('input', wipeReady);
+$('#wipe-confirm').addEventListener('input', wipeReady);
+$('#wipe').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const day = $('#wipe-day').value;
+  if (!day || $('#wipe-confirm').value.trim() !== day) return;
+  $('#wipe-go').disabled = true;
+  try { await api('/v1/admin/day/' + day, { method: 'DELETE' }); $('#wipe-msg').textContent = `Removed the play numbers for ${day}.`; $('#wipe').reset(); wipeReady(); load(); }
+  catch { $('#wipe-msg').textContent = 'Couldn\'t remove it. Try again.'; wipeReady(); }
+});
 
 let world = null;
 async function drawMap() {
@@ -205,13 +311,13 @@ async function drawMap() {
   svg.selectAll('*').remove();
   const byNum = new Map(data.byCountry.map((c) => [A2NUM[c.country], c]));
   const max = Math.max(1, ...data.byCountry.map((c) => c.s));
-  const color = d3.scaleSequentialLog([1, max + 1], d3.interpolateRgb('#5a2235', '#ffb03a'));
+  const color = d3.scaleSequentialSqrt([0, max], d3.interpolateRgb('#4a1d30', '#ffb03a'));
   const proj = d3.geoNaturalEarth1().fitSize([960, 470], { type: 'Sphere' });
   const path = d3.geoPath(proj);
   const countries = topojson.feature(world, world.objects.countries).features;
   svg.append('path').attr('d', path({ type: 'Sphere' })).attr('fill', 'none').attr('stroke', 'var(--line)');
   svg.append('g').selectAll('path').data(countries).join('path').attr('d', path)
-    .attr('fill', (f) => { const c = byNum.get(+f.id); return c ? color(c.s + 1) : 'var(--map0)'; })
+    .attr('fill', (f) => { const c = byNum.get(+f.id); return c ? color(c.s) : 'var(--map0)'; })
     .attr('stroke', 'var(--bg)').attr('stroke-width', 0.4)
     .append('title').text((f) => { const c = byNum.get(+f.id); return `${f.properties.name}: ${c ? fmt(c.s) + ' sessions, ' + hours(c.a) + ' h' : 'no plays'}`; });
 }
@@ -227,25 +333,32 @@ function renderFeedback() {
   for (const m of list) {
     const meta = el('div', { class: 'meta' },
       el('span', { class: 'kind ' + m.kind }, m.kind),
-      new Date(m.created).toLocaleString(), 'v' + m.version, PLATFORM_NAMES[m.platform] || m.platform,
-      m.track !== '-' ? (TRACK_NAMES[m.track] || m.track) : '', m.quality !== '-' ? m.quality.toUpperCase() : '', regionName(m.country),
+      ...[new Date(m.created).toLocaleString(), 'v' + m.version, PLATFORM_NAMES[m.platform] || m.platform,
+        m.track !== '-' ? (TRACK_NAMES[m.track] || m.track) : '', m.quality !== '-' ? m.quality.toUpperCase() : '', regionName(m.country)]
+        .filter(Boolean).map((t) => el('span', { class: 'dot' }, t)),
       el('span', { class: 'spacer' }),
       el('button', { class: 'small', onclick: async () => { await api('/v1/admin/feedback/' + m.id, { method: 'POST', body: JSON.stringify({ status: m.status === 'new' ? 'done' : 'new' }) }); m.status = m.status === 'new' ? 'done' : 'new'; renderFeedback(); } }, m.status === 'new' ? 'Mark done' : 'Mark new'),
-      el('button', { class: 'small', onclick: async () => { if (!(await ask('Delete this feedback for good?'))) return; await api('/v1/admin/feedback/' + m.id, { method: 'DELETE' }); data.feedback = data.feedback.filter((x) => x !== m); renderFeedback(); } }, 'Delete'));
+      el('button', { class: 'small', onclick: async () => { if (!(await ask('Delete this feedback for good? This can\'t be undone.', 'Delete'))) return; await api('/v1/admin/feedback/' + m.id, { method: 'DELETE' }); data.feedback = data.feedback.filter((x) => x !== m); renderFeedback(); } }, 'Delete'));
     box.append(el('div', { class: 'msg' + (m.status === 'done' ? ' done' : '') }, meta, el('div', { class: 'text' }, m.text)));
   }
 }
 
-// an in-page yes/no (no browser dialogs)
-function ask(text) {
+// an in-page confirmation for something destructive (no browser dialogs): Cancel has the
+// focus, so Enter or Escape backs out
+function ask(text, action) {
   return new Promise((done) => {
     const d = el('dialog', {}, el('p', {}, text));
     d.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;max-width:420px';
-    const row = el('div', { class: 'chips' }, el('button', { class: 'primary', onclick: () => { d.close(); done(true); } }, 'Yes'), el('button', { onclick: () => { d.close(); done(false); } }, 'Cancel'));
-    d.append(row); document.body.append(d); d.showModal();
-    d.addEventListener('close', () => d.remove());
+    let answer = false;
+    const cancel = el('button', { onclick: () => d.close() }, 'Cancel');
+    const row = el('div', { class: 'chips' }, cancel, el('button', { class: 'destructive', onclick: () => { answer = true; d.close(); } }, action));
+    d.append(row); document.body.append(d); d.showModal(); cancel.focus();
+    d.addEventListener('close', () => { d.remove(); done(answer); });
   });
 }
+
+let resizeT = 0;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (data && !$('#app').hidden) drawDays(); }, 150); });
 
 if (key) load(); else showLogin();
 </script>
