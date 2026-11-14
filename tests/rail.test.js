@@ -136,3 +136,92 @@ test('a car drives through the corkscrew and out in its lane at speed', () => {
   assert.ok(Math.abs(exit.lat - lane) < 0.3, `kept its lane (in at ${lane}, out at ${exit.lat})`);
   assert.ok(exit.speed > 50, `kept its speed (${exit.speed})`);
 });
+
+// --- the helix (Neon City): driven freely up a car park, off the roof ---------------------------
+const city = LAYOUTS.city;
+const cityTrack = new TrackPath(city.points, { width: city.width });
+const helix = new Rail(cityTrack, city.features.find((f) => f.type === 'helix'));
+helix.flattenCurvature();
+
+// drive with a per-step control function until the car leaves the helix (or time runs out)
+function driveHelix(v, ctl, seconds, steerable = true) {
+  const dt = 1 / 120;
+  let out = null, wall = 0, topSpeed = 0;
+  for (let t = 0; t < seconds && !out; t += dt) {
+    if (v.ride) {
+      const r = railStep(v, ctl(v), dt, 1, steerable);
+      if (v.railHit) wall++;
+      if (v.ride) topSpeed = Math.max(topSpeed, Math.hypot(v.ride.vF, v.ride.vx));
+      if (r) out = { out: r, speed: v.speed, lat: v.lateral };
+      continue;
+    }
+    v.update(dt, ctl(v));
+    v.constrain(cityTrack);
+    tryEnterRail(v, [helix], cityTrack);
+  }
+  return { out, wall, topSpeed };
+}
+
+// a driver holding the middle of the deck
+const holdLane = (lane = 0) => (v) => {
+  if (!v.ride) return gas;
+  const want = Math.max(-0.3, Math.min(0.3, 0.08 * (v.ride.lat - lane)));
+  return { ...gas, steer: Math.max(-1, Math.min(1, 3 * (v.ride.h - want))) };
+};
+
+test('the helix deck never dips under the street, even at its low edge', () => {
+  const ground = cityTrack.pointAt(helix.s0, 0).y, hw = cityTrack.halfWidth + 0.6;
+  let worst = Infinity;
+  for (let u = 0; u < helix.length; u += 1) for (const lat of [-hw, hw]) worst = Math.min(worst, helix.pose(u, lat).y - ground);
+  assert.ok(worst > -0.05, `lowest edge ${worst.toFixed(2)} m from the street`);
+});
+
+test('a car steering up the helix drives off the roof, its speed its own', () => {
+  const v = new Vehicle(CARS[1]);
+  v.placeOnTrack(cityTrack, helix.sA - 40, 0, 45);
+  const run = driveHelix(v, holdLane(), 20);
+  assert.equal(run.out && run.out.out, 'air', 'launched off the roof');
+  assert.ok(run.wall < 30, `barely touched the walls (${run.wall} knocks)`);
+  assert.ok(v.air, 'flying');
+});
+
+test('on the helix the car turns, slides and is not carried', () => {
+  const v = new Vehicle(CARS[0]);
+  v.placeOnTrack(cityTrack, helix.sA - 10, 0, 40);
+  driveHelix(v, (car) => (car.ride && car.ride.t > 0.4 ? { ...gas, steer: 1 } : gas), 1.2);
+  assert.ok(v.ride && v.ride.free, 'on the helix');
+  assert.ok(Math.abs(v.ride.h) > 0.1, `turned on the deck (h ${v.ride.h.toFixed(2)})`);
+  // coast in slowly: no minimum speed pushes it up, it just rolls to a stop
+  const slow = new Vehicle(CARS[3]);
+  slow.placeOnTrack(cityTrack, helix.sA - 3, 0, 9);
+  const coast = driveHelix(slow, (car) => (car.ride ? { steer: 0, throttle: 0, brake: 0, boost: false } : gas), 40);
+  assert.ok(coast.topSpeed < 15, `never pushed along (${coast.topSpeed.toFixed(1)} m/s)`);
+  assert.ok(!coast.out || coast.out.out === 'back', 'not carried up and off');
+});
+
+test('a car not steering drifts to the outside wall and scrapes up it, no crash', () => {
+  const v = new Vehicle(CARS[2]);
+  v.placeOnTrack(cityTrack, helix.sA - 30, 0, 45);
+  const run = driveHelix(v, () => gas, 25);
+  assert.ok(run.wall > 0, 'met the wall');
+  assert.equal(run.out && run.out.out, 'air', 'still made it up and off');
+  assert.ok(!v.wrecked);
+});
+
+test('the AI is kept in its lane up the helix', () => {
+  const v = new Vehicle(CARS[4]);
+  v.placeOnTrack(cityTrack, helix.sA - 20, 3, 45);
+  let lane = null, worst = 0;
+  const dt = 1 / 120;
+  for (let t = 0; t < 20; t += dt) {
+    if (v.ride) {
+      if (lane === null) lane = v.ride.lat;
+      worst = Math.max(worst, Math.abs(v.ride.lat - lane));
+      if (railStep(v, gas, dt, 1, false)) break;
+      continue;
+    }
+    v.update(dt, gas); v.constrain(cityTrack); tryEnterRail(v, [helix], cityTrack);
+  }
+  assert.ok(v.air, 'off the roof');
+  assert.ok(worst < 0.5, `held its lane (strayed ${worst.toFixed(2)} m)`);
+});

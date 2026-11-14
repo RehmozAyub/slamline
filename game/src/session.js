@@ -18,7 +18,7 @@ import { PickupVisuals } from './pickups.js';
 import { DriveAssist, ASSIST_RULES } from './assist.js';
 import { signatureAt, hairpinS } from './signatures.js';
 import { constrainOnRoads } from './shortcut.js';
-import { tryEnterRail, railStep, railContacts } from './rail.js';
+import { tryEnterRail, railStep, railContacts, RAIL } from './rail.js';
 import { jumpAt, bankAt, gripAt } from './features.js';
 import { FenceProps } from './props.js';
 import { RivalMarkers } from './markers.js';
@@ -335,7 +335,9 @@ export class RaceSession {
         const ctl = H.assistOn ? H.assist.apply(v, inp) : inp;
         c.controls = { ...ctl, boost: H.boost.boosting, draft: H.drafting };
         c.mul = 1;
+        c.manual = true; // driven by a person (the helix lets them steer freely)
       } else {
+        c.manual = false;
         if (!c.ai) c.ai = new AIDriver(v, this.track, { lane: v.lateral, skill: 0.8, aggression: 0, shortcuts: this.shortcuts ? this.shortcuts.list : [] });
         c.ai.hazards = this.obstacles;
         const me = this.race.byId.get(c.id);
@@ -355,7 +357,12 @@ export class RaceSession {
       for (const c of this.cars) {
         if (c.remote) { if (c.vehicle.wrecked) c.vehicle.updateWreck(h); continue; } // driven on the other device
         const v = c.vehicle, prevU = v.onSC ? v.scU : -1, prevSC = v.sc;
-        if (v.ride) { const rail = v.ride.rail, out = railStep(v, c.controls, h, c.mul, !!c.human); if (out === 'done') this.onRailDone(c, rail); continue; }
+        if (v.ride) {
+          const rail = v.ride.rail, out = railStep(v, c.controls, h, c.mul, !!c.manual, c.manual && c.human.assistOn ? 0.9 : RAIL.bankAssist);
+          if (out === 'done') this.onRailDone(c, rail);
+          if (v.railHit) this.onRailScrape(c, v.railHit);
+          continue;
+        }
         if (this.ice.length) v.surface = v.onSC ? 1 : gripAt(this.ice, this.track, v.s);
         v.update(h, c.controls, c.mul);
         const hit = this.constrainCar(c, h);
@@ -395,7 +402,28 @@ export class RaceSession {
   // back onto the main road (so race progress keeps working) and v.scU / v.scIdx hold the
   // position along the shortcut.
   constrainCar(c, dt) {
-    return constrainOnRoads(c.vehicle, this.track, this.shortcuts, dt, this.tmpP, this.tmpQ, this.jumps, this.banks);
+    const hit = constrainOnRoads(c.vehicle, this.track, this.shortcuts, dt, this.tmpP, this.tmpQ, this.jumps, this.banks);
+    return hit || (this.rails.length ? this.railEnd(c.vehicle) : null);
+  }
+
+  // Under the end of a helix's roof the road ends in a solid wall (the car park's end): driving
+  // back up the road the wrong way, you hit it instead of going through to the spiral's start.
+  railEnd(v) {
+    if (v.air || v.onSC || v.wrecked || v.ride) return null;
+    for (const r of this.rails) {
+      if (!r.release) continue;
+      const back = this.track.deltaS(v.s, r.s1);
+      if (back <= 0 || back > 5) continue;
+      const p = this.track.pointAt(r.s1 + 0.05, v.lateral, this.tmpE || (this.tmpE = {}));
+      v.x = p.x; v.z = p.z; v.s = this.track.wrapS(r.s1 + 0.05); v.idx = p.idx;
+      const nx = p.tx, nz = p.tz, vn = -(v.vx * nx + v.vz * nz);
+      if (vn <= 0) return null;
+      const speed = Math.hypot(v.vx, v.vz), out = Math.max(vn * 1.3, vn + 1.5), fr = Math.min(0.45, vn * 0.022) / v.mass;
+      v.vx = (v.vx + nx * out) * (1 - fr); v.vz = (v.vz + nz * out) * (1 - fr);
+      v.yawRate *= 0.6; v.scraping = 1;
+      return { vn, angle: (Math.asin(Math.min(1, vn / Math.max(speed, 1e-3))) * 180) / Math.PI, speed, nx, nz, x: p.x - nx, y: v.y + 0.5, z: p.z - nz };
+    }
+    return null;
   }
 
   // --- trains at level crossings (train.js) ----------------------------------------------
@@ -556,6 +584,17 @@ export class RaceSession {
     if (!H) return;
     this.shake(H, 0.25);
     this.game.audio.whoosh(true, 0.3);
+  }
+
+  // scraping a helix's wall: sparks and a knock, never a crash
+  onRailScrape(c, hit) {
+    const v = c.vehicle, H = c.human;
+    if (hit.vn > 3) this.fx.sparks(hit.x, hit.y, hit.z, v.vx, v.vz, Math.min(24, hit.vn * 2), Math.min(1.6, hit.vn / 12));
+    if (H && hit.vn > 4 && this.impactCooldown <= 0) {
+      this.game.audio.impact(Math.min(0.8, hit.vn / 20));
+      this.shake(H, Math.min(0.4, hit.vn / 30));
+      this.impactCooldown = 0.15;
+    }
   }
 
   // made it through: boost for a human, and a chime (off a helix it's the landing that pays)

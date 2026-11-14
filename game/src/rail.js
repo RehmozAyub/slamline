@@ -8,18 +8,22 @@
 //               on down the road
 //
 // A car on a rail rides it: v.ride = { rail, u, lat, vF, t } (u = metres along the rail, lat =
-// across it, vF = speed along it). Race progress keeps working: v.s is mapped from u onto the
+// across it, vF = speed along it). Loops and corkscrews carry the car (it can only drift across);
+// a helix is driven like the road (free: true, with h = heading relative to the rail and vx =
+// sideways speed), walls at its edges. Race progress keeps working: v.s is mapped from u onto the
 // main road, and v.x / v.z stay on the main road's line in track space (so the minimap, AI
 // traffic checks and race order see a car moving steadily along). Only the drawn car and the
 // camera use the 3D pose (v.pose). Cars on a rail can't crash, collide or be hit.
 import { BOOST_SPEED, BOOST_ACCEL } from './config.js';
+import { wrapAngle } from './trackMath.js';
 
 export const RAIL = {
   lead: 12, // flat road at each end of the rail, laid exactly on the main road (m)
   gap: 8, // a loop leaves this far before the jog corner (the road is still dead straight)
   gravity: 13, // m/s^2 along the rail (arcade: a bit over half of real gravity)
-  minSpeed: 34, // m/s: a rail always carries a car through
-  steerRate: 7, // m/s across the rail at full steer
+  minSpeed: 34, // m/s: a loop or corkscrew always carries a car through
+  steerRate: 7, // m/s across a loop or corkscrew at full steer
+  bankAssist: 0.7, // on a helix (driven freely): how much of its turning the banking does for you
   sway: [0.2, 0.8], // a loop's sideways drift happens over this part of it
   step: 0.5, // rail sample spacing (m)
   carLen: 4.3, carWide: 2.1, // contact box between two cars on the rail
@@ -150,16 +154,20 @@ export class Rail {
     this.centre = [P0.x + R0[0] * R, P0.z + R0[1] * R];
     this.radius = R;
     this.height = rise;
-    const bank = 0.16; // leaning in a little toward the middle
+    // leaning in a little toward the middle, but never so much that the low edge dips under the
+    // ground at the bottom, and flat again for the roof at the top
+    const bank = 0.16, edge = track.halfWidth + 1.2;
     const total = turns * 2 * Math.PI, steps = Math.round(turns * 160);
     for (let k = 0; k <= steps; k++) {
       const ph = (k / steps) * total, f = k / steps;
       // round the centre, tangent to the road at the start; height eases in and out
       const ox = -Math.cos(ph) * R, oz = Math.sin(ph) * R;
       // climbs steadily, levelling off at both ends
-      raw.push([this.centre[0] + R0[0] * ox + T0[0] * oz, P0.y + rise * (f - Math.sin(2 * Math.PI * f) / (2 * Math.PI)), this.centre[1] + R0[1] * ox + T0[1] * oz]);
+      const y = rise * (f - Math.sin(2 * Math.PI * f) / (2 * Math.PI));
+      raw.push([this.centre[0] + R0[0] * ox + T0[0] * oz, P0.y + y, this.centre[1] + R0[1] * ox + T0[1] * oz]);
       const inx = Math.cos(ph) * R0[0] - Math.sin(ph) * T0[0], inz = Math.cos(ph) * R0[1] - Math.sin(ph) * T0[1]; // toward the centre
-      ups.push([inx * bank, 1, inz * bank]);
+      const lean = Math.max(0, Math.min(bank, y / edge, (bank * (1 - f)) / 0.12));
+      ups.push([inx * lean, 1, inz * lean]);
     }
     // then straight on along the road on top, to the edge
     const P = {};
@@ -236,7 +244,16 @@ export function tryEnterRail(v, rails, track, tmp = {}) {
     else if (zone === 'lead-out' && along < 0) u = rail.uOf(v.s);
     else if (zone === 'ride' && !rail.release) u = rail.uOf(v.s); // got there some other way: put it on the rail
     else continue;
-    v.ride = { rail, u, lat: Math.max(-rail.track.halfWidth + 1.1, Math.min(rail.track.halfWidth - 1.1, v.lateral)), vF: zone === 'ride' ? Math.max(RAIL.minSpeed, along) : along, t: 0 };
+    const lat = Math.max(-rail.track.halfWidth + 1.1, Math.min(rail.track.halfWidth - 1.1, v.lateral));
+    if (rail.kind === 'helix') {
+      // driven on: the car keeps its heading, speed, slide and drift (all relative to the road)
+      const cs = Math.cos(p.heading), sn = Math.sin(p.heading);
+      v.ride = { rail, u, lat, free: true, h: wrapAngle(v.heading - p.heading), vx: v.vx * cs - v.vz * sn, vF: v.vx * sn + v.vz * cs, t: 0 };
+      v.pose = turnPose(rail.pose(u, lat, v.pose || {}), v.ride.h);
+      v.air = false; v.trick = null;
+      return true;
+    }
+    v.ride = { rail, u, lat, vF: zone === 'ride' ? Math.max(RAIL.minSpeed, along) : along, t: 0 };
     v.pose = rail.pose(u, v.ride.lat, v.pose || {});
     v.drifting = false; v.yawRate = 0; v.slip = 0; v.air = false; v.trick = null;
     return true;
@@ -248,7 +265,9 @@ export function tryEnterRail(v, rails, track, tmp = {}) {
 // car's track-space state and its 3D pose. When the car rolls off either end it is put back on
 // the main road: returns 'done' (came out forwards), 'back', 'air' (launched off the end of a
 // helix: v.air is set and the car flies on) or null.
-export function railStep(v, c, dt, mul = 1, steerable = true) {
+// bank: on a helix, how much of its turning is done for the driver (more with the drive assist)
+export function railStep(v, c, dt, mul = 1, steerable = true, bank = RAIL.bankAssist) {
+  if (v.ride.free) return freeStep(v, c, dt, mul, steerable, bank);
   const L = v.ride, rail = L.rail, track = rail.track, sp = v.spec, R = rail.R;
   const top = sp.topSpeed * mul * (c.boost ? BOOST_SPEED : 1);
   const acc = sp.accel * mul * (c.boost ? BOOST_ACCEL : 1);
@@ -297,6 +316,83 @@ export function railStep(v, c, dt, mul = 1, steerable = true) {
     v.pose = null;
   } else if (out) { v.lastGround = p.y; v.vyGround = 0; v.pose = null; }
   else rail.pose(L.u, L.lat, pose);
+  return out;
+}
+
+// A rail pose turned by h round its up (the car's heading relative to the rail, + = left)
+export function turnPose(P, h) {
+  if (!h) return P;
+  const c = Math.cos(h), s = Math.sin(h);
+  const tx = P.tx * c - P.bx * s, ty = P.ty * c - P.by * s, tz = P.tz * c - P.bz * s;
+  const bx = P.bx * c + P.tx * s, by = P.by * c + P.ty * s, bz = P.bz * c + P.tz * s;
+  P.tx = tx; P.ty = ty; P.tz = tz; P.bx = bx; P.by = by; P.bz = bz;
+  return P;
+}
+
+// The helix's own flat road for the vehicle physics: the rail unrolled straight along +z (x =
+// left, so lateral = -x), walls at the deck's edges
+const FLAT = {
+  halfWidth: 0,
+  project(x, z, idx, out) {
+    out.idx = 0; out.s = z; out.lateral = -x; out.grade = 0; out.y = 0;
+    out.tx = 0; out.tz = 1; out.rx = -1; out.rz = 0;
+    return out;
+  },
+};
+const tmpPose = {};
+
+// One step driving a helix: the usual car physics in the rail's frame. As the car moves along,
+// the rail turns under it, so holding a line takes steering (the banking does most of it). The
+// AI (steerable false) is simply kept in its lane.
+function freeStep(v, c, dt, mul, steerable, bank) {
+  const L = v.ride, rail = L.rail, track = rail.track, R = rail.R;
+  const pose = v.pose || (v.pose = {});
+  rail.pose(L.u, L.lat, tmpPose);
+  const th0 = Math.atan2(tmpPose.tx, tmpPose.tz), climb = tmpPose.ty;
+  v.x = -L.lat; v.z = L.u; v.heading = L.h; v.vx = L.vx; v.vz = L.vF;
+  v.air = false;
+  v.update(dt, steerable ? c : { ...c, steer: 0, handbrake: false }, mul);
+  v.vz -= R.gravity * climb * dt; // uphill slows you a little
+  // the rail turning under the car (all of it held for the AI)
+  rail.pose(Math.max(0, Math.min(rail.length, v.z)), 0, tmpPose);
+  const d = wrapAngle(Math.atan2(tmpPose.tx, tmpPose.tz) - th0) * (steerable ? 1 - bank : 0);
+  if (d) {
+    const cd = Math.cos(d), sd = Math.sin(d), vx = v.vx;
+    v.vx = vx * cd - v.vz * sd; v.vz = v.vz * cd + vx * sd;
+    v.heading = wrapAngle(v.heading - d);
+  }
+  if (!steerable) { const k = Math.exp(-dt * 10); v.heading *= k; v.yawRate *= k; v.vx *= k; }
+  FLAT.halfWidth = track.halfWidth;
+  const hit = v.constrain(FLAT, 0, Math.sign(-v.x) || 1); // the deck's walls: you scrape along them
+  L.u = v.z; L.lat = -v.x; L.h = v.heading; L.vx = v.vx; L.vF = v.vz; L.t += dt;
+  v.vF = v.vx * Math.sin(v.heading) + v.vz * Math.cos(v.heading);
+
+  let out = null;
+  if (L.u >= rail.length || L.u < 0) {
+    out = L.u < 0 ? 'back' : 'air';
+    v.s = track.wrapS(out === 'back' ? rail.sA + L.u : rail.sB + (L.u - rail.length));
+    v.ride = null;
+  } else v.s = rail.sOf(L.u);
+  rail.pose(Math.max(0, Math.min(rail.length, L.u)), L.lat, pose);
+  const railTy = pose.ty;
+  // track-space state on the main road under the rail (race order, minimap, AI)
+  const p = track.pointAt(v.s, L.lat), th = p.heading, cs = Math.cos(th), sn = Math.sin(th);
+  v.x = p.x; v.z = p.z; v.y = p.y; v.roadY = p.y;
+  v.idx = p.idx; v.lateral = L.lat; v.grade = 0; v.pitch = 0; v.roll = 0;
+  v.heading = wrapAngle(th + L.h);
+  v.vx = L.vx * cs + L.vF * sn; v.vz = L.vF * cs - L.vx * sn;
+  v.railHit = hit && hit.vn > 2 ? { vn: hit.vn, x: pose.x + pose.bx * Math.sign(L.lat), y: pose.y + 0.5, z: pose.z + pose.bz * Math.sign(L.lat) } : null;
+  if (out === 'air') {
+    // off the roof: fly on down the road (shortcut.js airStep lands the car)
+    v.air = true;
+    v.airY = pose.y;
+    v.vy = L.vF * railTy + rail.release.launch;
+    v.airTime = 0; v.airG = 0; v.trick = null; v.trickKind = 'spin';
+    v.lastGround = p.y; v.vyGround = 0;
+    v.y = pose.y;
+    v.pose = null;
+  } else if (out) { v.lastGround = p.y; v.vyGround = 0; v.pose = null; }
+  else turnPose(pose, L.h);
   return out;
 }
 

@@ -19,6 +19,8 @@ import { RemoteCar, History, SMOOTH } from './remoteCar.js';
 import { HitJudge, plausibleContact } from './hits.js';
 import { AIDriver } from '../ai.js';
 import { POWER_IDS } from '../powerups.js';
+import { turnPose } from '../rail.js';
+import { wrapAngle } from '../trackMath.js';
 
 export const NET_VERSION = 3; // bump when the protocol changes; everyone needs the same
 export const MAX_PLAYERS = 8;
@@ -208,6 +210,7 @@ export class Online {
       const u = Math.max(0, Math.min(rail.length, st.scU + vF * ahead));
       v.ride = { rail, u, lat: st.lateral, vF, t: 0 };
       v.pose = rail.pose(u, st.lateral, v.pose || {});
+      if (rail.kind === 'helix') turnPose(v.pose, wrapAngle(st.heading - S.track.pointAt(st.s, 0).heading)); // driven, so turned like the car
     } else { v.ride = null; v.pose = null; }
     v.ghost = st.flags & FLAG.ghost ? 0.3 : 0;
     v.boosting = !!(st.flags & FLAG.boosting);
