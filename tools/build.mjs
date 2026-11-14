@@ -27,10 +27,11 @@ cpSync(join(root, 'game'), join(build, 'game'), { recursive: true });
 copyFileSync(join(root, 'electron', 'main.cjs'), join(build, 'main.cjs'));
 copyFileSync(join(root, 'electron', 'icon.png'), join(build, 'icon.png'));
 // the official-build key (stats.js / server/): lets the stats server tell this exe from a copy
-// someone built themselves. It lives only on this PC and in the server's secrets, never in git.
-const keyFile = join(build, 'build-key.txt');
+// someone built themselves. It lives only on this PC (.keys/, gitignored) and in the server's
+// secrets, never in git.
+const keyFile = join(root, '.keys', 'build-key.txt');
 if (existsSync(keyFile)) writeFileSync(join(build, 'game', 'official.json'), JSON.stringify({ key: readFileSync(keyFile, 'utf8').trim() }));
-else console.warn('No build-key.txt in the build folder: this exe sends no play stats or feedback.');
+else console.warn('No .keys/build-key.txt: this exe sends no play stats or feedback.');
 
 console.log('Running electron-builder...');
 run('npx electron-builder --win portable --x64');

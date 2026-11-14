@@ -7,10 +7,10 @@ A Cloudflare Worker with a D1 database: it takes the game's anonymous play stats
 
 ## Keys
 
-Two secrets live in the Worker and on the owner's PC only, never in git:
+Two secrets live in the Worker and in the project's `.keys/` folder (gitignored) only, never in git:
 
-- `ADMIN_KEY` opens the dashboard. A copy is in `%LOCALAPPDATA%\SlamlineBuild\dashboard-key.txt`.
-- `BUILD_KEY` marks the official Windows exe. `tools/build.mjs` copies `%LOCALAPPDATA%\SlamlineBuild\build-key.txt` into the exe as `official.json`; without that file an exe sends nothing.
+- `ADMIN_KEY` opens the dashboard. It is in `.keys/dashboard-key.txt`.
+- `BUILD_KEY` marks the official Windows exe. `tools/build.mjs` copies `.keys/build-key.txt` into the exe as `official.json`; without that file an exe sends nothing.
 
 To change a key: write the new value to the file, then `npx wrangler@4.155.0 secret put ADMIN_KEY` (or `BUILD_KEY`) in this folder and paste it. A new `BUILD_KEY` stops older exes from sending.
 
