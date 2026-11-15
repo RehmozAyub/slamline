@@ -8,7 +8,10 @@
   --grad: linear-gradient(100deg, var(--hot) 0%, var(--hot2) 100%);
   font-family: 'Bahnschrift', 'Segoe UI', 'Arial Narrow', sans-serif;
   font-variation-settings: 'wdth' 75, 'wght' 600;
+  color-scheme: dark;
 }
+/* a dark-mode rule tells Samsung Internet the page has its own dark look, so it leaves the colours alone */
+@media (prefers-color-scheme: dark) { html { background: #000; } }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: var(--ink); user-select: none; cursor: default; }

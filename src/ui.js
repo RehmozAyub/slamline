@@ -113,7 +113,7 @@ export class UI {
             <div class="touchonly">
               <h2>TOUCH CONTROLS</h2>
               <p>The car <b>accelerates by itself</b>. Your left thumb steers, your right thumb does the rest.</p>
-              <p><b>STEER</b> slide your left thumb left or right (how far = how hard), or pick <b>◀ ▶ buttons</b> or <b>tilt</b> in Settings.</p>
+              <p><b>STEER</b> press <b>◀ ▶</b> with your left thumb, or pick the <b>thumb slider</b> (how far = how hard) or <b>tilt</b> in Settings.</p>
               <p><b>DRIFT</b> hold while you turn into a bend. <b>BRAKE</b> slows you down; hold it when stopped to reverse.</p>
               <p><b>BOOST</b> tap to fire until the meter runs dry (tap again to stop), or hold it. Tap it before GO for a <b>perfect start</b>.</p>
               <p><b>POWER</b> shows the power-up you hold: tap to use it.</p>
