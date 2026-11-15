@@ -41,7 +41,7 @@ plays show up as their own platform, "itch.io", on the dashboard).
    - Tags (up to 10): `arcade`, `racing`, `3D`, `driving`, `multiplayer`, `local-multiplayer`, `split-screen`, `cars`, `browser`, `neon`.
    - App store links: none. Custom noun: leave empty.
    - Community: **Comments** on, so players can leave feedback under the game.
-   - Cover image (630 × 500) and 3 to 5 screenshots (1280 × 720 or larger). Shots from Neon City, Skyport and Magma Core read well small.
+   - Cover image (630 × 500) and 3 to 5 screenshots (1280 × 720 or larger), all ready in `itch/media/`: `cover.png` (Neon City; `cover-alt-*.png` are other choices) and `screenshot-1` to `-5` (1920 × 1080, in the order to upload them).
 
 6. Save as **Draft**, open the page and play a race: check fullscreen, the sound, a phone (open the
    page on it), RECORD in the pause menu (the saved video should download) and FEEDBACK. Then set
