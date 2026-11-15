@@ -1,0 +1,82 @@
+# Every push to main that changes the game updates the itch.io page: the web game (channel
+# "html", played in the browser) and the Windows exe (channel "windows").
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   BUTLER_API_KEY      an itch.io API key (itch.io → Settings → API keys)
+#   SLAMLINE_BUILD_KEY  the official-build key (.keys/build-key.txt) so the exe sends play stats
+#                       and feedback; without it the exe still builds, just without them
+# The page is rehmozayub/slamline unless the repository variable ITCH_TARGET says otherwise.
+name: itch.io
+
+on:
+  push:
+    branches: [main]
+    paths: ['game/**', 'electron/**', 'tools/build.mjs', 'tools/itch.mjs', '.github/workflows/itch.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: itch
+  cancel-in-progress: true # a newer push replaces a build still running
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      ITCH_TARGET: ${{ vars.ITCH_TARGET || 'rehmozayub/slamline' }}
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tests
+        run: npm test
+
+      - name: Version
+        id: ver
+        shell: bash
+        run: |
+          v=$(sed -n "s/.*VERSION = '\(.*\)'.*/\1/p" game/src/version.js)
+          echo "user=$v-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Web game zip
+        run: node tools/itch.mjs
+
+      - name: Official-build key
+        shell: bash
+        env:
+          KEY: ${{ secrets.SLAMLINE_BUILD_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then mkdir -p .keys && printf '%s' "$KEY" > .keys/build-key.txt; fi
+
+      - name: Electron download cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-44.4.5-${{ runner.os }}
+
+      - name: Windows exe
+        run: node tools/build.mjs
+
+      - name: Install butler
+        if: env.BUTLER_API_KEY != ''
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://broth.itch.zone/butler/windows-amd64/LATEST/archive/default -OutFile butler.zip
+          Expand-Archive butler.zip -DestinationPath "$env:RUNNER_TEMP\butler"
+          "$env:RUNNER_TEMP\butler" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Push to itch.io
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          butler push release/slamline-itch.zip "${{ env.ITCH_TARGET }}:html" --userversion "${{ steps.ver.outputs.user }}"
+          butler push release/Slamline.exe "${{ env.ITCH_TARGET }}:windows" --userversion "${{ steps.ver.outputs.user }}"
+
+      - name: No itch.io key yet
+        if: env.BUTLER_API_KEY == ''
+        run: echo "::warning::BUTLER_API_KEY is not set, so nothing was pushed to itch.io (see .github/workflows/itch.yml)"

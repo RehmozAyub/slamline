@@ -49,20 +49,23 @@ plays show up as their own platform, "itch.io", on the dashboard).
 
 ## 2. Each release
 
-`npm run release` always writes `release/slamline-itch.zip` (and the exe). Either:
+Automatic: every push to `main` that changes the game runs `.github/workflows/itch.yml` on GitHub
+Actions. It runs the tests, builds the web zip and the exe, and pushes them with butler (itch.io's
+upload tool) to the page's `html` and `windows` channels, versioned like `2.17-abc1234`. It takes about
+10 minutes; watch it under the repository's Actions tab.
 
-- **By hand:** on the itch.io page, Edit game → Uploads → replace the zip (and the exe) with the new
-  ones, keeping "played in the browser" ticked.
-- **Automatically, with butler** (itch.io's upload tool):
-  1. Install butler: https://itch.io/docs/butler/installing.html (put it on PATH).
-  2. Run `butler login` once (it opens itch.io to authorise).
-  3. Write the page's name, `username/slamline`, into `.keys/itch-target.txt` (gitignored).
+One-time setup:
+1. itch.io → Settings → API keys → Generate new API key.
+2. Add two repository secrets (GitHub → Settings → Secrets and variables → Actions, or
+   `gh secret set NAME`, which asks for the value):
+   - `BUTLER_API_KEY`: that itch.io key.
+   - `SLAMLINE_BUILD_KEY`: the contents of `.keys/build-key.txt`, so the exe sends play stats and
+     feedback.
+3. After the first automatic push, open Edit game → Uploads: tick "This file will be played in the
+   browser" on the new `html` upload and set the `windows` one to Windows, then delete the two files
+   uploaded by hand.
 
-  From then on every `npm run release` pushes the zip to the page's `html` channel and the exe to
-  `windows`, with the version number. The first time butler pushes, open the page's Uploads and tick
-  "played in the browser" on the `html` upload once.
-
-`node tools/itch.mjs` builds just the zip.
+`node tools/itch.mjs` builds just the zip, to try it locally.
 
 ## Page text
 

@@ -326,6 +326,7 @@ class Game {
     } else if (key === 'steering') {
       const k = STEERING.indexOf(s.steering);
       s.steering = STEERING[(k + dir + STEERING.length) % STEERING.length];
+      s.steeringPicked = true;
       if (s.steering === 'tilt') TouchControls.askMotion(); // iOS: must happen inside this tap
       this.touch.setMode(s.steering);
     } else if (key === 'mirror') {

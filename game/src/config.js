@@ -119,11 +119,13 @@ function migrateStorage() {
 }
 
 export function loadSettings() {
-  const def = { quality: 'auto', autoQ: null, steering: 'slider', vibration: true, motionBlur: true, mirror: true, shareStats: true, master: 0.8, music: 0.55, assist: true, assist2: true, cars: 8, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
+  const def = { quality: 'auto', autoQ: null, steering: 'buttons', vibration: true, motionBlur: true, mirror: true, shareStats: true, master: 0.8, music: 0.55, assist: true, assist2: true, cars: 8, bestLaps: {}, progress: { stars: {}, signatures: {}, totalTakedowns: 0 } };
   migrateStorage();
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     const p = s.progress || {};
+    // ◀ ▶ BUTTONS is the default since v2.17: a steering mode is kept only if the player picked it
+    if (!s.steeringPicked) delete s.steering;
     return { ...def, ...s, bestLaps: { ...(s.bestLaps || {}) }, progress: { stars: { ...(p.stars || {}) }, signatures: { ...(p.signatures || {}) }, totalTakedowns: p.totalTakedowns || 0 } };
   } catch {
     return def;

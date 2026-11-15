@@ -4,8 +4,8 @@
 //      is only for your own phone and is never uploaded)
 //   3. pushes main, publishes game/ to the gh-pages branch (the Pages site)
 //   4. creates GitHub release vX.Y with the exe attached
-//   5. itch.io: always writes release/slamline-itch.zip (the web game); pushes it and the exe to the
-//      itch.io page with butler once .keys/itch-target.txt names the page (tools/itch.mjs)
+//   5. itch.io: writes release/slamline-itch.zip (the web game) to try locally; the itch.io page
+//      itself updates from GitHub Actions on every push to main (.github/workflows/itch.yml)
 // The version is the latest release tag plus one minor step (v2.4 -> v2.5); `--version 3.0` overrides it.
 // `--notes "text"` puts a summary above the change list. `--dry-run` runs the checks and tests and
 // prints the plan without building or publishing anything.
@@ -14,7 +14,7 @@ import { existsSync, statSync, writeFileSync, readFileSync, mkdtempSync } from '
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { buildItchZip, pushToItch } from './itch.mjs';
+import { buildItchZip } from './itch.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = 'RehmozAyub/slamline';
@@ -117,10 +117,5 @@ writeFileSync(notesFile, notes);
 run(`gh release create ${tag} "${exe}" --repo ${REPO} --target main --title "SLAMLINE ${tag}" --notes-file "${notesFile}"`);
 sh('git fetch origin --tags --quiet');
 
-step('itch.io');
-let itch = false;
-try { itch = pushToItch(version, exe); } catch (e) { console.log(`Not pushed to itch.io: ${e.message}`); }
-if (!itch) console.log('Upload release/slamline-itch.zip on the itch.io page by hand (or set up butler: tools/itch.mjs).');
-
-console.log(`\nShipped ${tag}:\n  Pages:   ${PAGES} (live in a minute or two)\n  Release: https://github.com/${REPO}/releases/tag/${tag}${itch ? `
-  itch.io: https://${itch.split('/')[0]}.itch.io/${itch.split('/')[1]}` : ''}`);
+console.log(`\nShipped ${tag}:\n  Pages:   ${PAGES} (live in a minute or two)\n  Release: https://github.com/${REPO}/releases/tag/${tag}
+  itch.io: updates itself from the push (GitHub Actions, about 10 minutes): https://github.com/${REPO}/actions/workflows/itch.yml`);
