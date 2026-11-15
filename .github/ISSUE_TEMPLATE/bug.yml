@@ -19,6 +19,8 @@ body:
     attributes:
       label: Where do you play?
       options:
+        - itch.io, on a computer
+        - itch.io, on a phone or tablet
         - Browser on a computer
         - Browser on a phone or tablet
         - Windows exe
