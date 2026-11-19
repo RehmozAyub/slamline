@@ -19,13 +19,20 @@ const QUALITIES = ['low', 'medium', 'high'];
 const KINDS = ['bug', 'idea', 'other'];
 const FEEDBACK_MAX = 1000;
 const FEEDBACK_PER_DAY = 300; // all players together; past it the form says "try tomorrow"
+// the dashboard holds the admin key: it may talk only to this server (and fetch the world map),
+// load only its pinned scripts, and never be framed by another site
+const DASHBOARD_HEADERS = {
+  'content-security-policy': "default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'referrer-policy': 'no-referrer',
+  'x-content-type-options': 'nosniff',
+};
 
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const path = url.pathname;
     try {
-      if (path === '/dashboard') return new Response(DASHBOARD, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
+      if (path === '/dashboard') return new Response(DASHBOARD, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex', ...DASHBOARD_HEADERS } });
       if (path.startsWith('/v1/stats') || path.startsWith('/v1/admin/')) return admin(req, env, url);
       if (path === '/v1/beat' || path === '/v1/feedback') {
         const origin = req.headers.get('origin') || '';
@@ -71,6 +78,7 @@ function reply(status, data, origin, env) {
 
 // at most `max` bytes of JSON object, else null
 async function readJson(req, max) {
+  if (+req.headers.get('content-length') > max) return null; // don't read a huge body at all
   const text = await req.text();
   if (text.length > max) return null;
   try { const v = JSON.parse(text); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch { return null; }

@@ -14,6 +14,9 @@ on:
     paths: ['game/**', 'electron/**', 'tools/build.mjs', 'tools/itch.mjs', '.github/workflows/itch.yml']
   workflow_dispatch:
 
+permissions:
+  contents: read # the job only reads the code; its uploads use the itch.io key
+
 concurrency:
   group: itch
   cancel-in-progress: true # a newer push replaces a build still running

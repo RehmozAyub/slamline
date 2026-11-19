@@ -33,7 +33,7 @@ app.whenReady().then(async () => {
     let p = decodeURIComponent(new URL(req.url).pathname);
     if (p === '/' || p === '') p = '/index.html';
     const file = path.normalize(path.join(GAME_DIR, p));
-    if (!file.startsWith(GAME_DIR)) return new Response('Forbidden', { status: 403 });
+    if (file !== GAME_DIR && !file.startsWith(GAME_DIR + path.sep)) return new Response('Forbidden', { status: 403 }); // (a sibling like game2\ is outside too)
     // local files: skip the HTTP cache so an updated game never runs stale modules
     const res = await net.fetch(pathToFileURL(file).toString());
     const headers = new Headers(res.headers);
